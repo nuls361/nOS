@@ -4,6 +4,28 @@ Persönliches Chief-of-Staff-System für Niels (niels@songpush.com). Single-User
 
 **Kein Monitoring-Cockpit** — eine **Entwurfs-Maschine für Kommunikations- und Nacharbeit** bei SongPush/WePush. Das System bereitet Arbeit vor (Mail-Entwürfe, Call-Nachbereitung, Delegation, CRM-Pflege), Niels prüft und gibt frei. Kein Auto-Send, nirgends.
 
+## Lokale Entwicklung
+
+Voraussetzungen: Node.js 22+ und pnpm 10.
+
+```bash
+cp .env.example .env
+pnpm install
+pnpm dev
+```
+
+Die Web-App läuft unter `http://localhost:5173`, der Server unter
+`http://localhost:3000`. `GET /health` dient als Readiness-Check.
+
+CI-freundliche Prüfungen:
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
 > Revidierter Plan, Stand 08.09.2026 — ersetzt den ursprünglichen „Jarvis"-Projektplan
 > (mobile-first Entscheidungs-Cockpit mit Projekt-Tabs). Begründung der Kürzungen: siehe unten.
 

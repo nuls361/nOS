@@ -1,0 +1,23 @@
+{
+  "name": "@nos/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "lint": "eslint src",
+    "test": "vitest run src",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "latest",
+    "dotenv": "latest",
+    "fastify": "latest"
+  },
+  "devDependencies": {
+    "tsx": "latest",
+    "vitest": "latest"
+  }
+}
