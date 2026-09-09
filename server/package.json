@@ -16,7 +16,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "latest",
     "@google-cloud/local-auth": "2.1.0",
     "dotenv": "latest",
     "fastify": "latest",

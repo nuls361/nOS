@@ -78,8 +78,8 @@ Beispiel: Kunde fragt „können wir auf Rechnung zahlen?" → System findet, wi
 
 **Nicht embeddings-first.** Drei Schichten:
 
-1. **Agentische Suche über Postgres-FTS.** Alle Mails werden nach Postgres gesynct (Volltext-Index). Der Draft-Agent (Claude Agent SDK) bekommt Suche als Tools: `search_mail`, `read_thread`, `search_calls`, `read_attio`, `read_playbook` — er sucht iterativ („Rechnung", „Zahlungsziel", „payment terms"), liest Treffer-Threads und zitiert die Quelle auf der Karte („so beantwortet im Juni bei Flaconi").
-2. **Antwort-Playbook.** Wöchentlicher Job destilliert die Sent-Historie in editierbare Markdown-Dateien (`playbook/zahlungsbedingungen.md`, …). Der Agent hat das Playbook immer im Kontext; jede freigegebene Antwort erzeugt einen Playbook-Update-Vorschlag (Hybrid-Gedächtnis: System schlägt vor, Niels bestätigt/editiert).
+1. **Agentische Suche über Postgres-FTS.** Alle Mails werden nach Postgres gesynct (Volltext-Index). Der Draft-Agent (Vercel AI SDK, Tool-Calling-Loop über OpenRouter) bekommt Suche als Tools: `search_mail`, `read_thread`, `search_calls`, `read_attio`, `read_playbook` — er sucht iterativ („Rechnung", „Zahlungsziel", „payment terms"), liest Treffer-Threads und zitiert die Quelle auf der Karte („so beantwortet im Juni bei Flaconi").
+2. **Antwort-Playbook.** Wöchentlicher Job destilliert die Sent-Historie in editierbare Markdown-Texte (`zahlungsbedingungen`, `onboarding`, …), gespeichert in Postgres und über die UI editierbar. Der Agent hat das Playbook immer im Kontext; jede freigegebene Antwort erzeugt einen Playbook-Update-Vorschlag (Hybrid-Gedächtnis: System schlägt vor, Niels bestätigt/editiert).
 3. **Embeddings nur als Nachrüstung**, falls FTS-Recall nicht reicht (DE/EN-Mix, Synonyme): pgvector auf Ebene „eingehende Frage → gegebene Antwort"-Paare, als zusätzliches Ranking-Tool. Kein Umbau.
 
 ## Datenmodell (Skelett)
@@ -90,18 +90,18 @@ Beispiel: Kunde fragt „können wir auf Rechnung zahlen?" → System findet, wi
 - `cards` — Typ, Status (offen/freigegeben/ignoriert/gesnoozt), Payload, Quellen-Referenzen
 - `actions` — auszuführende/ausgeführte Aktionen je Karte
 - `audit_log` — jede ausgeführte Aktion mit Zeitstempel, Freigabe, Inhalt
-- `playbook/*.md` — editierbare Markdown-Dateien im Repo-Stil
+- `playbook` — editierbare Markdown-Texte in Postgres (kein persistentes Dateisystem auf Vercel)
 
 ## Tech-Stack
 
 | Komponente | Wahl |
 |---|---|
-| Backend | TypeScript/Node + Claude Agent SDK |
+| Backend | TypeScript/Node + Vercel AI SDK (Provider: OpenRouter) |
 | Web-App | React (SPA), ein Raum, Karten-Stream |
 | DB | Postgres (+ FTS, später ggf. pgvector) |
-| Agent-Kontext | Markdown-Playbook, editierbar |
-| Scheduling | Cron/Queue, Polling-Takt (Recordings ~15 Min, Mail ~30 Min) |
-| Hosting | Kleiner Server (Hetzner/Fly.io) |
+| Agent-Kontext | Markdown-Playbook in Postgres, editierbar |
+| Scheduling | Vercel Cron, Polling-Takt (Recordings ~15 Min, Mail ~30 Min) |
+| Hosting | Vercel (Functions + Cron) |
 | Integrationen | Gmail API, Attio API/MCP |
 
 ## Roadmap
