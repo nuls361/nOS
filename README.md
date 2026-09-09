@@ -29,6 +29,17 @@ pnpm build
 pnpm test:db
 ```
 
+### Gmail-Synchronisierung
+
+1. Gmail API im Google-Cloud-Projekt aktivieren und einen OAuth-Client vom Typ
+   „Desktop app“ erstellen.
+2. Die heruntergeladene Datei als `secrets/google-oauth-client.json` speichern.
+3. Einmalig `pnpm gmail:auth` ausführen.
+4. Mit `pnpm gmail:sync -- --full` die letzten zwölf Monate aus Inbox und Sent
+   importieren. Danach genügt `pnpm gmail:sync` für den inkrementellen Lauf.
+
+OAuth-Dateien unter `secrets/` werden nie eingecheckt.
+
 > Revidierter Plan, Stand 08.09.2026 — ersetzt den ursprünglichen „Jarvis"-Projektplan
 > (mobile-first Entscheidungs-Cockpit mit Projekt-Tabs). Begründung der Kürzungen: siehe unten.
 

@@ -13,6 +13,8 @@
     "test": "pnpm -r test",
     "test:db": "pnpm --filter @nos/server test:db",
     "db:migrate": "pnpm --filter @nos/server db:migrate",
+    "gmail:auth": "pnpm --filter @nos/server gmail:auth",
+    "gmail:sync": "pnpm --filter @nos/server gmail:sync",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
