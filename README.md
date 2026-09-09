@@ -11,6 +11,8 @@ Voraussetzungen: Node.js 22+ und pnpm 10.
 ```bash
 cp .env.example .env
 pnpm install
+docker compose up -d postgres
+pnpm db:migrate
 pnpm dev
 ```
 
@@ -24,6 +26,7 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm test:db
 ```
 
 > Revidierter Plan, Stand 08.09.2026 — ersetzt den ursprünglichen „Jarvis"-Projektplan
