@@ -4,12 +4,16 @@ import { migrate } from './migrate.js';
 import { createPool } from './pool.js';
 
 const pool = createPool();
+const createdThreadIds: string[] = [];
 
 beforeAll(async () => {
   await migrate();
 });
 
 afterAll(async () => {
+  if (createdThreadIds.length) {
+    await pool.query('DELETE FROM threads WHERE id = ANY($1::uuid[])', [createdThreadIds]);
+  }
   await pool.end();
 });
 
@@ -20,6 +24,7 @@ describe('database schema', () => {
 
   it('finds German and English terms with simple FTS', async () => {
     const threadId = randomUUID();
+    createdThreadIds.push(threadId);
     await pool.query(
       `INSERT INTO threads (id, provider, external_id, subject)
        VALUES ($1, 'test', $2, 'Zahlungsbedingungen')`,
@@ -37,10 +42,16 @@ describe('database schema', () => {
     );
 
     const german = await pool.query(
-      `SELECT id FROM messages WHERE search_document @@ websearch_to_tsquery('simple', 'Rechnung Zahlungsziel')`
+      `SELECT id FROM messages
+       WHERE thread_id = $1
+         AND search_document @@ websearch_to_tsquery('simple', 'Rechnung Zahlungsziel')`,
+      [threadId]
     );
     const english = await pool.query(
-      `SELECT id FROM messages WHERE search_document @@ websearch_to_tsquery('simple', 'payment invoice')`
+      `SELECT id FROM messages
+       WHERE thread_id = $1
+         AND search_document @@ websearch_to_tsquery('simple', 'payment invoice')`,
+      [threadId]
     );
     const pairs = await pool.query('SELECT * FROM reply_pairs WHERE thread_id = $1', [threadId]);
 

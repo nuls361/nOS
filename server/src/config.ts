@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './env.js';
 
 const parsePort = (value: string | undefined): number => {
   const port = Number(value ?? 3000);
