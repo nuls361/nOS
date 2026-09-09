@@ -10,9 +10,10 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "gmail:auth": "tsx src/gmail/auth.ts",
     "gmail:sync": "tsx src/gmail/cli.ts",
+    "attio:sync": "tsx src/attio/cli.ts",
     "lint": "eslint src",
     "test": "vitest run src --exclude '**/*.integration.test.ts'",
-    "test:db": "vitest run src/db/schema.integration.test.ts",
+    "test:db": "vitest run src/db/schema.integration.test.ts src/attio/repository.integration.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
