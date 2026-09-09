@@ -15,7 +15,8 @@
     "db:migrate": "pnpm --filter @nos/server db:migrate",
     "gmail:auth": "pnpm --filter @nos/server gmail:auth",
     "gmail:sync": "pnpm --filter @nos/server gmail:sync",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "gmail:setup": "bash scripts/gmail-oauth-wizard.sh"
   },
   "devDependencies": {
     "@eslint/js": "latest",

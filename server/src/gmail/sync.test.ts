@@ -39,10 +39,14 @@ describe('GmailSync', () => {
 
     const result = await new GmailSync(api, repository).full();
 
+    expect(vi.mocked(api.listMessages).mock.calls[0]?.[0]).toContain('-in:trash');
+
     expect(result).toEqual({ mode: 'full', messages: 3, historyId: '20' });
     expect(api.getMessage).toHaveBeenCalledTimes(3);
     expect(repository.saveMessage).toHaveBeenCalledTimes(3);
     expect(repository.saveSyncState).toHaveBeenCalledWith('niels@songpush.com', '20', true);
+    // Cursor stammt aus dem Profilabruf VOR dem Listing (nur ein Aufruf nötig).
+    expect(api.getProfile).toHaveBeenCalledOnce();
   });
 
   it('uses history for incremental sync', async () => {

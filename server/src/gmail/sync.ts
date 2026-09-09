@@ -40,19 +40,24 @@ export class GmailSync {
   }
 
   async full(): Promise<{ mode: 'full'; messages: number; historyId: string }> {
+    // Den History-Cursor VOR dem Listing festhalten: Nachrichten, die während des
+    // Backfills eintreffen, würden sonst weder im Listing noch im späteren
+    // History-Delta auftauchen. Ein zu früher Cursor kostet nur Duplikate (Upsert).
     const profile = await this.client.getProfile();
     const ids: string[] = [];
     let pageToken: string | undefined;
     do {
-      const page = await this.client.listMessages(`after:${twelveMonthsAgo()} {in:inbox in:sent}`, pageToken);
+      const page = await this.client.listMessages(
+        `after:${twelveMonthsAgo()} -in:chats -in:drafts -in:spam -in:trash`,
+        pageToken
+      );
       ids.push(...page.items.map(({ id }) => id));
       pageToken = page.nextPageToken;
     } while (pageToken);
 
     const messages = await this.saveMessages(ids);
-    const latestProfile = await this.client.getProfile();
-    await this.repository.saveSyncState(profile.emailAddress, latestProfile.historyId, true);
-    return { mode: 'full', messages, historyId: latestProfile.historyId };
+    await this.repository.saveSyncState(profile.emailAddress, profile.historyId, true);
+    return { mode: 'full', messages, historyId: profile.historyId };
   }
 
   async incremental(): Promise<{ mode: 'incremental' | 'full'; messages: number; historyId: string }> {
