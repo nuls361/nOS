@@ -1,11 +1,11 @@
 import { isRelevantExternalHumanMail } from './filter.js';
 import type { EmailCardRepository } from './repository.js';
-import type { EmailDraftGenerator } from './types.js';
+import type { MailCardGenerator } from './mail-card.js';
 
 type EmailQueue = Pick<EmailCardRepository, 'claimNext' | 'createCard' | 'markSkipped' | 'markFailed'>;
 
 export class EmailCardPipeline {
-  constructor(private readonly repository: EmailQueue, private readonly generator: EmailDraftGenerator) {}
+  constructor(private readonly repository: EmailQueue, private readonly generator: MailCardGenerator) {}
 
   async processNext(): Promise<'created' | 'existing' | 'skipped' | null> {
     const mail = await this.repository.claimNext();
@@ -15,8 +15,8 @@ export class EmailCardPipeline {
       return 'skipped';
     }
     try {
-      const draft = await this.generator.generate(mail);
-      const result = await this.repository.createCard(mail, draft);
+      const proposal = await this.generator.generate(mail);
+      const result = await this.repository.createCard(mail, proposal);
       return result.existing ? 'existing' : 'created';
     } catch (error) {
       await this.repository.markFailed(mail.messageDatabaseId, error);

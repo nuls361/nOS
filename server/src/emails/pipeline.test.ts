@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Draft } from '../agent/draft-agent.js';
+import type { MailCardProposal } from './mail-card.js';
 import { EmailCardPipeline } from './pipeline.js';
 import type { EmailWorkItem } from './types.js';
 
@@ -9,9 +9,12 @@ const workItem = (sender = 'Karla <karla@example.com>'): EmailWorkItem => ({
   recipients: ['niels@songpush.com'], cc: [], subject: 'Angebot', body: 'Was kostet das?',
   headers: {}, labelIds: ['INBOX'], sentAt: new Date()
 });
-const draft: Draft = {
-  subject: 'Re: Angebot', body: 'Gerne. Der Preis ist [PREIS BESTÄTIGEN].', tone: 'du', confidence: 0.7,
-  sensitivePlaceholders: [{ label: '[PREIS BESTÄTIGEN]', reason: 'Preis muss freigegeben werden' }], citations: []
+const draft: MailCardProposal = {
+  reply: {
+    subject: 'Re: Angebot', body: 'Gerne. Der Preis ist [PREIS BESTÄTIGEN].', tone: 'du', confidence: 0.7,
+    sensitivePlaceholders: [{ label: '[PREIS BESTÄTIGEN]', reason: 'Preis muss freigegeben werden' }], citations: []
+  },
+  delegation: { shouldDelegate: false, reason: 'Keine Routing-Historie vorhanden.', citations: [] }
 };
 
 describe('EmailCardPipeline', () => {

@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import type { Draft } from '../agent/draft-agent.js';
+import type { MailCardProposal } from './mail-card.js';
 import type { EmailWorkItem } from './types.js';
 
 export interface CreatedEmailCard {
@@ -55,7 +55,8 @@ export class EmailCardRepository {
     } : null;
   }
 
-  async createCard(mail: EmailWorkItem, draft: Draft): Promise<CreatedEmailCard> {
+  async createCard(mail: EmailWorkItem, proposal: MailCardProposal): Promise<CreatedEmailCard> {
+    const { reply: draft, delegation } = proposal;
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -65,7 +66,7 @@ export class EmailCardRepository {
          ON CONFLICT (source_type, source_id) WHERE source_type IS NOT NULL AND source_id IS NOT NULL
          DO NOTHING RETURNING id`,
         [mail.subject ? `Antwort: ${mail.subject}` : `Antwort an ${mail.sender}`,
-          JSON.stringify({ sender: mail.sender, draft }),
+          JSON.stringify({ sender: mail.sender, draft, delegation }),
           JSON.stringify([{ sourceId: `mail:${mail.messageDatabaseId}`, label: mail.subject }]),
           mail.messageExternalId]
       );
@@ -92,6 +93,28 @@ export class EmailCardRepository {
           ...draft
         })]
       );
+      // Delegation haengt an derselben Karte statt an einer zweiten: eine Mail,
+      // eine Entscheidung, jede Aktion einzeln freizugeben.
+      if (delegation.shouldDelegate) {
+        await client.query(
+          `INSERT INTO actions (card_id, type, status, payload)
+           VALUES ($1, 'gmail_forward', 'pending', $2)`,
+          [cardId, JSON.stringify({
+            colleague: delegation.colleague,
+            sourceMessageId: mail.messageExternalId,
+            subject: delegation.briefingSubject,
+            body: delegation.briefingBody,
+            citations: delegation.citations
+          })]
+        );
+        if (delegation.task) {
+          await client.query(
+            `INSERT INTO actions (card_id, type, status, payload)
+             VALUES ($1, 'attio_task', 'pending', $2)`,
+            [cardId, JSON.stringify(delegation.task)]
+          );
+        }
+      }
       await this.setStatus(client, mail.messageDatabaseId, 'processed');
       await client.query('COMMIT');
       return { cardId, existing: false };

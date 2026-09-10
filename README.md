@@ -123,8 +123,7 @@ Der Hebel ist nicht Information (Dashboard), sondern **vorbereitete Arbeit**.
    - Follow-up-Mail-Entwurf an den Kunden
    - Attio-Updates, Feld für Feld als Diff
    - Delegations-Forward an Lina/Noah/Robert + Attio-Task (Tasks werden im Team voll gelebt)
-2. **Antwort-Entwurf** — für jede eingehende externe menschliche Mail, mit Präzedenzfall-Suche + Playbook (siehe unten).
-3. **Delegations-Vorschlag** — für interne Mails: Routing-Erkennung + Forward-Entwurf mit Briefing.
+2. **Mail-Karte** — für jede eingehende externe menschliche Mail: Antwort-Entwurf **und** Delegations-Entscheidung aus **einem** Agentenlauf (Präzedenzfall-Suche + Playbook, siehe unten). Ergibt eine Karte mit bis zu drei einzeln freizugebenden Aktionen: Antwort senden, intern weiterleiten, Attio-Task.
 
 **Freigabe-Modell:** Jede Karte zeigt den exakten Wortlaut / Feld-Diff, ist editierbar. Freigeben = Direktversand über Gmail im richtigen Thread (korrektes In-Reply-To/References) bzw. Attio-Write. Alles landet im Audit-Log. Kein Auto-Send — Guardrails vorerst nicht nötig, da alles geprüft wird.
 
