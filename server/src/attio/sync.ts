@@ -20,11 +20,14 @@ export interface AttioSyncResult {
 export class AttioSync {
   constructor(private readonly client: AttioClient, private readonly repository: AttioStore) {}
 
-  private async syncObject(objectSlug: 'companies' | 'deals'): Promise<number> {
+  private async syncObject(
+    objectSlug: 'companies' | 'deals',
+    filter?: Record<string, unknown>
+  ): Promise<number> {
     let offset = 0;
     let total = 0;
     while (true) {
-      const records = await this.client.listRecords(objectSlug, offset);
+      const records = await this.client.listRecords(objectSlug, offset, filter);
       for (const record of records) await this.repository.saveRecord(objectSlug, record);
       total += records.length;
       if (records.length < 500) return total;
@@ -33,13 +36,30 @@ export class AttioSync {
   }
 
   /**
-   * Vollabzug der CRM-Records. Teuer: der Workspace hat >40k Companies, ein
-   * Durchlauf dauert Minuten. Gehört in einen eigenen, seltenen Cron-Lauf und
-   * darf den 15-Minuten-Poll der Aufnahmen nicht blockieren. Attio erlaubt
-   * weder Filter noch Sortierung auf updated_at, ein Delta ist also nicht möglich.
+   * Abzug der CRM-Records. Der Workspace enthält 40–60k Companies, die
+   * überwiegend aus der Creator-Datenbank stammen — für nOS irrelevant.
+   * Gezogen wird deshalb nur, wer schon mindestens eine Kampagne hatte
+   * (~900 Records, wenige Sekunden). Alles andere löst
+   * syncCompaniesByDomain() bei Bedarf auf.
+   *
+   * Attio erlaubt weder Filter noch Sortierung auf updated_at — ein echtes
+   * Delta ist über diese API nicht möglich, deshalb ein voller, aber kleiner Abzug.
    */
   async syncRecords(): Promise<AttioRecordSyncResult> {
-    return { companies: await this.syncObject('companies'), deals: await this.syncObject('deals') };
+    return {
+      companies: await this.syncObject('companies', { total_campaigns: { $gt: 0 } }),
+      deals: await this.syncObject('deals')
+    };
+  }
+
+  /**
+   * Holt einzelne Firmen über ihre Domain nach — der Weg für Absender, die
+   * nicht im kommerziell aktiven Abzug stecken.
+   */
+  async syncCompaniesByDomain(domains: string[]): Promise<number> {
+    const records = await this.client.findCompaniesByDomain(domains);
+    for (const record of records) await this.repository.saveRecord('companies', record);
+    return records.length;
   }
 
   /**

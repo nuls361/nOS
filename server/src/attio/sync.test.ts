@@ -12,6 +12,7 @@ describe('AttioSync', () => {
   it('syncs records and turns completed recordings into unprocessed transcripts', async () => {
     const client: AttioClient = {
       listRecords: vi.fn().mockResolvedValue([]),
+      findCompaniesByDomain: vi.fn().mockResolvedValue([]),
       listMeetings: vi.fn().mockResolvedValue({ items: [meeting] }),
       listCallRecordings: vi.fn().mockResolvedValue({ items: [{
         id: { workspace_id: 'workspace', meeting_id: 'meeting', call_recording_id: 'recording' },
@@ -43,6 +44,7 @@ describe('AttioSync', () => {
   it('starts the window at the last poll instead of the fixed lookback', async () => {
     const client: AttioClient = {
       listRecords: vi.fn(),
+      findCompaniesByDomain: vi.fn(),
       listMeetings: vi.fn().mockResolvedValue({ items: [] }),
       listCallRecordings: vi.fn(),
       getTranscript: vi.fn()
@@ -65,6 +67,7 @@ describe('AttioSync', () => {
   it('does not fetch transcripts twice', async () => {
     const client: AttioClient = {
       listRecords: vi.fn().mockResolvedValue([]),
+      findCompaniesByDomain: vi.fn().mockResolvedValue([]),
       listMeetings: vi.fn().mockResolvedValue({ items: [meeting] }),
       listCallRecordings: vi.fn().mockResolvedValue({ items: [{
         id: { workspace_id: 'workspace', meeting_id: 'meeting', call_recording_id: 'recording' },
@@ -84,6 +87,7 @@ describe('AttioSync', () => {
   it('syncs CRM records only in the separate records run', async () => {
     const client: AttioClient = {
       listRecords: vi.fn().mockResolvedValue([]),
+      findCompaniesByDomain: vi.fn().mockResolvedValue([]),
       listMeetings: vi.fn(), listCallRecordings: vi.fn(), getTranscript: vi.fn()
     };
     const repository = {
@@ -95,5 +99,27 @@ describe('AttioSync', () => {
 
     expect(result).toEqual({ companies: 0, deals: 0 });
     expect(client.listMeetings).not.toHaveBeenCalled();
+    // Companies nur mit Kampagnen-Historie (~900 statt 40-60k), Deals komplett.
+    expect(client.listRecords).toHaveBeenCalledWith('companies', 0, { total_campaigns: { $gt: 0 } });
+    expect(client.listRecords).toHaveBeenCalledWith('deals', 0, undefined);
+  });
+
+  it('resolves companies by domain on demand', async () => {
+    const record = { id: { workspace_id: 'workspace', record_id: 'company' }, values: {} };
+    const client: AttioClient = {
+      listRecords: vi.fn(),
+      findCompaniesByDomain: vi.fn().mockResolvedValue([record]),
+      listMeetings: vi.fn(), listCallRecordings: vi.fn(), getTranscript: vi.fn()
+    };
+    const repository = {
+      saveRecord: vi.fn(), saveMeeting: vi.fn(), saveRecording: vi.fn(),
+      needsTranscript: vi.fn(), saveTranscript: vi.fn(), savePollTime: vi.fn(), getPollTime: vi.fn()
+    };
+
+    const found = await new AttioSync(client, repository).syncCompaniesByDomain(['oatsome.de']);
+
+    expect(found).toBe(1);
+    expect(client.findCompaniesByDomain).toHaveBeenCalledWith(['oatsome.de']);
+    expect(repository.saveRecord).toHaveBeenCalledWith('companies', record);
   });
 });

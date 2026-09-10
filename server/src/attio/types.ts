@@ -56,7 +56,12 @@ export interface CursorPage<T> {
 }
 
 export interface AttioClient {
-  listRecords(objectSlug: 'companies' | 'deals', offset: number): Promise<AttioRecord[]>;
+  listRecords(
+    objectSlug: 'companies' | 'deals',
+    offset: number,
+    filter?: Record<string, unknown>
+  ): Promise<AttioRecord[]>;
+  findCompaniesByDomain(domains: string[]): Promise<AttioRecord[]>;
   listMeetings(filters: { endsFrom: string; startsBefore: string }, cursor?: string): Promise<CursorPage<AttioMeeting>>;
   listCallRecordings(meetingId: string, cursor?: string): Promise<CursorPage<AttioCallRecording>>;
   getTranscript(meetingId: string, recordingId: string): Promise<AttioTranscript>;

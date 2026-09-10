@@ -53,9 +53,30 @@ export class HttpAttioClient implements AttioClient {
     return response.json() as Promise<AttioEnvelope<T>>;
   }
 
-  async listRecords(objectSlug: 'companies' | 'deals', offset: number): Promise<AttioRecord[]> {
+  async listRecords(
+    objectSlug: 'companies' | 'deals',
+    offset: number,
+    filter?: Record<string, unknown>
+  ): Promise<AttioRecord[]> {
     const response = await this.call<AttioRecord[]>(`/objects/${objectSlug}/records/query`, {
-      method: 'POST', body: JSON.stringify({ limit: 500, offset })
+      method: 'POST', body: JSON.stringify({ limit: 500, offset, ...(filter ? { filter } : {}) })
+    });
+    return response.data;
+  }
+
+  /**
+   * Auflösung einzelner Firmen über ihre Domain — für Threads und Calls mit
+   * Firmen außerhalb des kommerziell aktiven Abzugs. Antwortet in <1s und
+   * verträgt mehrere Domains in einer Abfrage.
+   */
+  async findCompaniesByDomain(domains: string[]): Promise<AttioRecord[]> {
+    if (!domains.length) return [];
+    const response = await this.call<AttioRecord[]>('/objects/companies/records/query', {
+      method: 'POST',
+      body: JSON.stringify({
+        limit: Math.min(500, domains.length * 5),
+        filter: { $or: domains.map((domain) => ({ domains: { domain } })) }
+      })
     });
     return response.data;
   }
