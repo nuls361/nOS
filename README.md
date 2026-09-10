@@ -49,6 +49,19 @@ Deals und die Meetings der letzten 24 Stunden. Abgeschlossene Call-Recordings
 werden samt Transkript gespeichert und für die Verarbeitung als `unprocessed`
 markiert. Im Betrieb wird der Befehl alle 15 Minuten ausgeführt.
 
+### Draft-Agent
+
+`OPENROUTER_API_KEY` und optional `OPENROUTER_MODEL` in `.env` setzen. Ein
+lokaler Testlauf ist anschließend möglich mit:
+
+```bash
+pnpm draft -- "Kunde fragt nach Zahlung auf Rechnung"
+```
+
+Der Agent kann ausschließlich die fünf Read-only-Tools `search_mail`,
+`read_thread`, `search_calls`, `read_attio` und `read_playbook` verwenden.
+Quellenangaben werden gegen tatsächlich gelesene Tool-Ergebnisse validiert.
+
 > Revidierter Plan, Stand 08.09.2026 — ersetzt den ursprünglichen „Jarvis"-Projektplan
 > (mobile-first Entscheidungs-Cockpit mit Projekt-Tabs). Begründung der Kürzungen: siehe unten.
 

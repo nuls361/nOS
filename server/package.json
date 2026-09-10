@@ -11,18 +11,22 @@
     "gmail:auth": "tsx src/gmail/auth.ts",
     "gmail:sync": "tsx src/gmail/cli.ts",
     "attio:sync": "tsx src/attio/cli.ts",
+    "draft": "tsx src/agent/cli.ts",
     "lint": "eslint src",
     "test": "vitest run src --exclude '**/*.integration.test.ts'",
-    "test:db": "vitest run src/db/schema.integration.test.ts src/attio/repository.integration.test.ts",
+    "test:db": "vitest run src/db/schema.integration.test.ts src/attio/repository.integration.test.ts src/agent/context-repository.integration.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@openrouter/ai-sdk-provider": "latest",
     "@google-cloud/local-auth": "2.1.0",
     "dotenv": "latest",
     "fastify": "latest",
     "googleapis": "105",
     "html-to-text": "latest",
-    "pg": "latest"
+    "ai": "latest",
+    "pg": "latest",
+    "zod": "latest"
   },
   "devDependencies": {
     "tsx": "latest",
