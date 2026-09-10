@@ -33,7 +33,15 @@ export class PlaybookRepository implements PlaybookWriter {
          SELECT 1 FROM playbook_mining_sources mined
          WHERE mined.source_type = candidate.source_type AND mined.source_id = candidate.source_id
        )
-       ORDER BY happened_at, source_type = 'reply_pair'
+         -- Kurze Wortwechsel ("Danke!" / "Gerne!") taugen nicht als Playbook-
+         -- Eintrag, kosten aber je einen Modelllauf. Das Archiv enthaelt davon
+         -- ein Vielfaches der brauchbaren Faelle, deshalb hier aussortieren
+         -- statt spaeter dafuer zu bezahlen.
+         AND length(btrim(candidate.answer)) >= 200
+         AND length(btrim(candidate.question)) >= 80
+       -- Frisch Freigegebenes zuerst, dann die juengste Historie: bei begrenztem
+       -- Budget soll es ins relevanteste Material fliessen, nicht in das aelteste.
+       ORDER BY candidate.source_type = 'reply_pair', happened_at DESC
        LIMIT 1`
     );
     const row = result.rows[0];
