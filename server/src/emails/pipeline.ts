@@ -3,7 +3,8 @@ import type { EmailCardRepository } from './repository.js';
 import type { MailCardGenerator } from './mail-card.js';
 import { containsPromptInjection } from '../security/untrusted-input.js';
 
-type EmailQueue = Pick<EmailCardRepository, 'claimNext' | 'createCard' | 'markSkipped' | 'markFailed'>;
+type EmailQueue = Pick<EmailCardRepository,
+  'claimNext' | 'createCard' | 'markSkipped' | 'markFailed' | 'createQuarantineCard'>;
 
 export class EmailCardPipeline {
   constructor(private readonly repository: EmailQueue, private readonly generator: MailCardGenerator) {}
@@ -12,7 +13,8 @@ export class EmailCardPipeline {
     const mail = await this.repository.claimNext();
     if (!mail) return null;
     if (containsPromptInjection(mail.subject, mail.body)) {
-      await this.repository.markSkipped(mail.messageDatabaseId, 'quarantined_prompt_injection');
+      // Sichtbar zurueckhalten statt lautlos verwerfen.
+      await this.repository.createQuarantineCard(mail, 'quarantined_prompt_injection');
       return 'skipped';
     }
     if (!isRelevantExternalHumanMail(mail)) {

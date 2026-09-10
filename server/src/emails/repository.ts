@@ -126,6 +126,43 @@ export class EmailCardRepository {
     }
   }
 
+  /**
+   * Zurueckgehaltene Mail sichtbar machen. Ohne Karte faellt eine falsch
+   * eingestufte Kundenmail komplett aus dem Arbeitsablauf, ohne Hinweis.
+   * Die Karte traegt bewusst KEINE Aktionen: nichts ist vorbereitet, der
+   * Mensch sieht die Mail im Postfach selbst an.
+   */
+  async createQuarantineCard(mail: EmailWorkItem, reason: string): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO cards (type, status, urgency, title, payload, sources, source_type, source_id)
+         VALUES ('quarantined', 'open', 55, $1, $2, $3, 'gmail_message', $4)
+         ON CONFLICT (source_type, source_id) WHERE source_type IS NOT NULL AND source_id IS NOT NULL
+         DO NOTHING`,
+        [`Zurückgehalten: ${mail.subject ?? mail.sender}`,
+          JSON.stringify({
+            reason,
+            sender: mail.sender,
+            note: 'Diese Mail wurde nicht verarbeitet. Bitte im Postfach selbst ansehen.'
+          }),
+          JSON.stringify([{ sourceId: `mail:${mail.messageDatabaseId}`, label: mail.subject }]),
+          mail.messageExternalId]
+      );
+      await client.query(
+        `UPDATE messages SET processing_status = 'skipped', processing_error = $2 WHERE id = $1`,
+        [mail.messageDatabaseId, reason]
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async markSkipped(id: string, reason?: string): Promise<void> {
     await this.pool.query(
       `UPDATE messages SET processing_status = 'skipped', processing_error = $2 WHERE id = $1`, [id, reason ?? null]
