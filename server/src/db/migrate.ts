@@ -28,6 +28,19 @@ export const migrate = async (): Promise<string[]> => {
     await ensureMigrationTable(client);
     const files = (await readdir(migrationsDirectory)).filter((file) => file.endsWith('.up.sql')).sort();
 
+    // Zwei Migrationen mit derselben Nummer sind auf einer frischen Datenbank
+    // reihenfolge-mehrdeutig — das faellt erst auf, wenn eine auf die andere
+    // aufbaut. Passiert leicht, wenn parallel entwickelt wird.
+    const byPrefix = new Map<string, string[]>();
+    for (const name of files) {
+      const prefix = name.split('_')[0] ?? name;
+      byPrefix.set(prefix, [...(byPrefix.get(prefix) ?? []), name]);
+    }
+    const duplicates = [...byPrefix.values()].filter((group) => group.length > 1);
+    if (duplicates.length) {
+      throw new Error(`Duplicate migration numbers: ${duplicates.map((g) => g.join(' + ')).join('; ')}`);
+    }
+
     for (const name of files) {
       const sql = await readFile(resolve(migrationsDirectory, name), 'utf8');
       const checksum = createHash('sha256').update(sql).digest('hex');
