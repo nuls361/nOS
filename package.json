@@ -19,6 +19,7 @@
     "draft": "pnpm --filter @nos/server draft",
     "calls:process": "pnpm --filter @nos/server calls:process",
     "emails:process": "pnpm --filter @nos/server emails:process",
+    "delegations:process": "pnpm --filter @nos/server delegations:process",
     "typecheck": "pnpm -r typecheck",
     "gmail:setup": "bash scripts/gmail-oauth-wizard.sh",
     "attio:records": "pnpm --filter @nos/server attio:records"

@@ -77,6 +77,14 @@ ohne KI-Aufruf übersprungen. Für relevante externe menschliche Mails entsteht 
 offene Karte mit einem Antwortentwurf als `pending`-Aktion; Preise, Zusagen und andere
 unsichere Details bleiben als sichtbare Platzhalter zur manuellen Freigabe markiert.
 
+### Delegationskarten
+
+`pnpm delegations:process` bewertet neue relevante externe Mails unabhängig von der
+Antwortkarten-Pipeline. Der Agent lernt das Routing zu Lina, Noah oder Robert aus
+historischen Sent-Forwards und vollständigen Threads. Nur bei belastbarer Zuordnung
+entsteht eine Delegationskarte mit einem `pending`-Forward-Briefing und optional einem
+separaten `pending`-Attio-Task; es wird nichts automatisch versendet oder verändert.
+
 > Revidierter Plan, Stand 08.09.2026 — ersetzt den ursprünglichen „Jarvis"-Projektplan
 > (mobile-first Entscheidungs-Cockpit mit Projekt-Tabs). Begründung der Kürzungen: siehe unten.
 
