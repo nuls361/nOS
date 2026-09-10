@@ -58,4 +58,26 @@ describe('ActionExecutor', () => {
     expect(repository.markFailed).toHaveBeenCalledWith(work, expect.any(Error));
     expect(repository.markExecuted).not.toHaveBeenCalled();
   });
+
+  it('never marks an executed action as failed when only the bookkeeping breaks', async () => {
+    const item = action('gmail_send', { to: ['kunde@example.com'], subject: 'Re: Hallo', body: 'Antwort' });
+    const repository = {
+      claimNext: vi.fn().mockResolvedValueOnce(item).mockResolvedValue(null),
+      markExecuted: vi.fn().mockRejectedValue(new Error('connection terminated')),
+      markFailed: vi.fn(),
+      markBookkeepingFailed: vi.fn()
+    };
+    const gmail = { send: vi.fn().mockResolvedValue({ messageId: 'sent-1' }) };
+    const attio = { updateRecord: vi.fn(), createTask: vi.fn() };
+
+    await new ActionExecutor(repository, gmail, attio, {}, {}).processNext();
+
+    // Die Mail ist raus. 'failed' wuerde zur erneuten Freigabe einladen -
+    // und damit zum zweiten Versand an den Kunden.
+    expect(gmail.send).toHaveBeenCalledOnce();
+    expect(repository.markFailed).not.toHaveBeenCalled();
+    expect(repository.markBookkeepingFailed).toHaveBeenCalledWith(
+      item, { messageId: 'sent-1' }, expect.any(Error)
+    );
+  });
 });

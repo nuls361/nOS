@@ -73,6 +73,26 @@ export class ActionRepository {
     }
   }
 
+  /**
+   * Die Aktion wurde ausgefuehrt (Mail ist raus, CRM ist geschrieben), aber das
+   * Festschreiben schlug fehl. Der Status bleibt bewusst 'executing': dieser
+   * Zustand wird nie erneut geholt, also kann nichts ein zweites Mal passieren.
+   * Als 'failed' zu markieren waere gefaehrlich - jemand wuerde die Aktion
+   * erneut freigeben und die Mail ginge zweimal raus.
+   */
+  async markBookkeepingFailed(action: ActionWorkItem, result: unknown, error: unknown): Promise<void> {
+    const message = error instanceof Error ? error.message : String(error);
+    await this.pool.query(
+      `INSERT INTO audit_log (action_id, event, actor, details)
+       VALUES ($1, 'execution_bookkeeping_failed', 'action-worker', $2)`,
+      [action.id, JSON.stringify({
+        approvedAt: action.approvedAt.toISOString(), approvedBy: action.approvedBy,
+        type: action.type, payload: action.payload, result, error: message.slice(0, 4_000),
+        note: 'Action was executed successfully; recording the result failed. Needs manual reconciliation.'
+      })]
+    );
+  }
+
   async markFailed(action: ActionWorkItem, error: unknown): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
     const client = await this.pool.connect();

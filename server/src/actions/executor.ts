@@ -4,7 +4,7 @@ import {
   gmailSendPayloadSchema, type ActionWorkItem, type AttioWriter, type GmailWriter
 } from './types.js';
 
-type Queue = Pick<ActionRepository, 'claimNext' | 'markExecuted' | 'markFailed'>;
+type Queue = Pick<ActionRepository, 'claimNext' | 'markExecuted' | 'markFailed' | 'markBookkeepingFailed'>;
 
 const asRecipients = (value: string | string[]): string[] => Array.isArray(value) ? value : [value];
 const validateRecipients = (values: string[]): string[] =>
@@ -70,11 +70,22 @@ export class ActionExecutor {
   async processNext(): Promise<boolean> {
     const action = await this.repository.claimNext();
     if (!action) return false;
+
+    let result: unknown;
     try {
-      const result = await this.execute(action);
-      await this.repository.markExecuted(action, result);
+      result = await this.execute(action);
     } catch (error) {
       await this.repository.markFailed(action, error);
+      return true;
+    }
+
+    // Ab hier ist die Aktion passiert und nicht mehr ruecknehmbar. Schlaegt nur
+    // noch das Festschreiben fehl, darf sie NICHT als 'failed' gelten - sonst
+    // gibt jemand sie erneut frei und die Mail geht ein zweites Mal raus.
+    try {
+      await this.repository.markExecuted(action, result);
+    } catch (error) {
+      await this.repository.markBookkeepingFailed(action, result, error);
     }
     return true;
   }
