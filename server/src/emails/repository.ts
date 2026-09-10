@@ -126,9 +126,9 @@ export class EmailCardRepository {
     }
   }
 
-  async markSkipped(id: string): Promise<void> {
+  async markSkipped(id: string, reason?: string): Promise<void> {
     await this.pool.query(
-      `UPDATE messages SET processing_status = 'skipped', processing_error = NULL WHERE id = $1`, [id]
+      `UPDATE messages SET processing_status = 'skipped', processing_error = $2 WHERE id = $1`, [id, reason ?? null]
     );
   }
 

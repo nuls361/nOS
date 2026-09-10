@@ -1,4 +1,5 @@
 import type { EmailWorkItem } from './types.js';
+import { containsPromptInjection } from '../security/untrusted-input.js';
 
 const addressPattern = /<([^<>]+)>|([^\s<>,]+@[^\s<>,]+)/;
 
@@ -22,6 +23,7 @@ const newsletterSubject = /\b(newsletter|digest|weekly update|unsubscribe|abmeld
 
 export const isRelevantExternalHumanMail = (mail: EmailWorkItem): boolean => {
   if (!mail.body.trim()) return false;
+  if (containsPromptInjection(mail.subject, mail.body)) return false;
   const address = extractEmailAddress(mail.sender);
   const [localPart = '', domain = ''] = address.split('@');
   if (!domain || domain === 'songpush.com' || domain.endsWith('.songpush.com')) return false;

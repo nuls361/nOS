@@ -1,6 +1,7 @@
 import { isRelevantExternalHumanMail } from './filter.js';
 import type { EmailCardRepository } from './repository.js';
 import type { MailCardGenerator } from './mail-card.js';
+import { containsPromptInjection } from '../security/untrusted-input.js';
 
 type EmailQueue = Pick<EmailCardRepository, 'claimNext' | 'createCard' | 'markSkipped' | 'markFailed'>;
 
@@ -10,6 +11,10 @@ export class EmailCardPipeline {
   async processNext(): Promise<'created' | 'existing' | 'skipped' | null> {
     const mail = await this.repository.claimNext();
     if (!mail) return null;
+    if (containsPromptInjection(mail.subject, mail.body)) {
+      await this.repository.markSkipped(mail.messageDatabaseId, 'quarantined_prompt_injection');
+      return 'skipped';
+    }
     if (!isRelevantExternalHumanMail(mail)) {
       await this.repository.markSkipped(mail.messageDatabaseId);
       return 'skipped';

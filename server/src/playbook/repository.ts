@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import type { MiningSource, PlaybookProposal, PlaybookWriter } from './types.js';
+import { containsPromptInjection } from '../security/untrusted-input.js';
 
 export class PlaybookRepository implements PlaybookWriter {
   constructor(private readonly pool: Pool) {}
@@ -42,9 +43,19 @@ export class PlaybookRepository implements PlaybookWriter {
        -- Frisch Freigegebenes zuerst, dann die juengste Historie: bei begrenztem
        -- Budget soll es ins relevanteste Material fliessen, nicht in das aelteste.
        ORDER BY candidate.source_type = 'reply_pair', happened_at DESC
-       LIMIT 1`
+       LIMIT 50`
     );
-    const row = result.rows[0];
+    const poisoned = result.rows.filter((row) => containsPromptInjection(row.subject, row.question, row.answer));
+    for (const row of poisoned) {
+      await this.pool.query(
+        `INSERT INTO playbook_mining_sources (source_type, source_id, outcome)
+         VALUES ($1, $2, 'skipped') ON CONFLICT DO NOTHING`,
+        [row.source_type, row.source_id]
+      );
+    }
+    const row = result.rows.find((candidate) => !containsPromptInjection(
+      candidate.subject, candidate.question, candidate.answer
+    ));
     if (!row) return null;
     const entries = await this.pool.query<{ slug: string; title: string; content: string }>(
       'SELECT slug, title, content FROM playbook_entries ORDER BY slug LIMIT 50'

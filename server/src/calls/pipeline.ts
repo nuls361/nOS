@@ -1,5 +1,6 @@
 import type { CallCardRepository } from './repository.js';
 import type { CallCardGenerator } from './types.js';
+import { containsPromptInjection } from '../security/untrusted-input.js';
 
 type CallQueue = Pick<CallCardRepository, 'claimNext' | 'createCard' | 'markFailed'>;
 
@@ -7,7 +8,11 @@ export class CallCardPipeline {
   constructor(private readonly repository: CallQueue, private readonly generator: CallCardGenerator) {}
 
   async processNext(): Promise<{ cardId: string; actionCount: number; existing: boolean } | null> {
-    const workItem = await this.repository.claimNext();
+    let workItem = await this.repository.claimNext();
+    while (workItem && containsPromptInjection(workItem.meetingTitle, workItem.rawTranscript)) {
+      await this.repository.markFailed(workItem.recordingDatabaseId, new Error('quarantined_prompt_injection'));
+      workItem = await this.repository.claimNext();
+    }
     if (!workItem) return null;
     try {
       const proposal = await this.generator.generate(workItem);

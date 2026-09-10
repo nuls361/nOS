@@ -114,6 +114,20 @@ Kundenspezifische oder nicht verallgemeinerbare Beispiele werden protokolliert u
 Titel und Markdown lassen sich editieren und werden erst durch die einzeln bestätigte
 `playbook_upsert`-Aktion in `playbook_entries` übernommen.
 
+### Prompt-Injection-Schutz
+
+Mailtexte und Transkripte sind ausschließlich untrusted Evidenz. Agent-Prompts
+kennzeichnen sie als solche; der Draft-Agent besitzt nur die fünf lesenden
+Kontext-Tools und kann keine Action erzeugen oder ausführen. Explizite Versuche,
+System-/Developer-Anweisungen zu überschreiben, Tools aufzurufen oder Secrets zu
+extrahieren, werden bereits vor dem Modelllauf quarantänisiert. Dadurch entsteht
+aus einer Injection-Mail weder eine Karte noch eine Action. Derselbe Filter liegt
+vor dem Playbook-Mining: vergiftete Historieneinträge werden als `skipped`
+protokolliert und niemals als Playbook-Vorschlag an ein Modell übergeben.
+
+Alle realen Änderungen laufen weiterhin ausschließlich durch den separaten
+Action-Layer und benötigen eine explizite, auditierte Freigabe.
+
 ### Call-Nachbereitung
 
 Nach dem Attio-Poll erzeugt `pnpm calls:process` aus neuen Transkripten
