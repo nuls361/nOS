@@ -64,6 +64,42 @@ export class HttpAttioClient implements AttioClient {
     return response.data;
   }
 
+  async updateRecord(input: {
+    objectSlug: 'companies' | 'deals'; recordId: string; field: string; value: unknown;
+  }): Promise<{ recordId: string }> {
+    const response = await this.call<AttioRecord>(
+      `/objects/${input.objectSlug}/records/${encodeURIComponent(input.recordId)}`,
+      { method: 'PATCH', body: JSON.stringify({ data: { values: { [input.field]: input.value } } }) }
+    );
+    return { recordId: response.data.id.record_id ?? input.recordId };
+  }
+
+  async createTask(input: {
+    title: string; description: string; assigneeId?: string; dueDate?: string;
+    objectSlug?: 'companies' | 'deals'; recordId?: string;
+  }): Promise<{ taskId: string }> {
+    const response = await this.call<{ id?: { task_id?: string }; task_id?: string }>('/tasks', {
+      method: 'POST',
+      body: JSON.stringify({
+        data: {
+          content: `${input.title}\n\n${input.description}`.slice(0, 2_000),
+          format: 'plaintext',
+          deadline_at: input.dueDate ?? null,
+          is_completed: false,
+          assignees: input.assigneeId ? [{
+            referenced_actor_type: 'workspace-member', referenced_actor_id: input.assigneeId
+          }] : [],
+          linked_records: input.objectSlug && input.recordId ? [{
+            target_object: input.objectSlug, target_record_id: input.recordId
+          }] : []
+        }
+      })
+    });
+    const taskId = response.data.id?.task_id ?? response.data.task_id;
+    if (!taskId) throw new Error('Attio task response lacks task ID');
+    return { taskId };
+  }
+
   /**
    * Auflösung einzelner Firmen über ihre Domain — für Threads und Calls mit
    * Firmen außerhalb des kommerziell aktiven Abzugs. Antwortet in <1s und

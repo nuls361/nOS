@@ -12,20 +12,22 @@ export class EmailCardRepository {
 
   async claimNext(): Promise<EmailWorkItem | null> {
     const result = await this.pool.query<{
-      id: string; external_id: string; thread_id: string; sender: string; recipients: string[];
+      id: string; external_id: string; thread_id: string; thread_external_id: string;
+      sender: string; recipients: string[];
       cc: string[]; subject: string | null; body_text: string; headers: Record<string, string>;
       label_ids: string[]; sent_at: Date;
     }>(
       `WITH candidate AS (
-         SELECT id FROM messages
-         WHERE direction = 'inbound'
-           AND (processing_status = 'unprocessed'
-             OR (processing_status = 'processing' AND processing_started_at < now() - interval '30 minutes'))
+         SELECT message.id, thread.external_id AS thread_external_id FROM messages message
+         JOIN threads thread ON thread.id = message.thread_id
+         WHERE message.direction = 'inbound'
+           AND (message.processing_status = 'unprocessed'
+             OR (message.processing_status = 'processing' AND message.processing_started_at < now() - interval '30 minutes'))
            -- Nur Mails ab dem Aktivierungszeitpunkt: der Gmail-Backfill spielt
            -- zwölf Monate Historie ein, und ohne diese Grenze erzeugt die
            -- Warteschlange für jede alte Mail einen Entwurf.
-           AND sent_at >= (SELECT queue_start_at FROM email_queue_state WHERE key = 'inbound')
-         ORDER BY sent_at, id
+           AND message.sent_at >= (SELECT queue_start_at FROM email_queue_state WHERE key = 'inbound')
+         ORDER BY message.sent_at, message.id
          FOR UPDATE SKIP LOCKED
          LIMIT 1
        )
@@ -33,7 +35,7 @@ export class EmailCardRepository {
          processing_status = 'processing', processing_started_at = now(), processing_error = NULL
        FROM candidate WHERE message.id = candidate.id
        RETURNING message.id, message.external_id, message.thread_id, message.sender,
-                 message.recipients, message.cc, message.subject, message.body_text,
+                 candidate.thread_external_id, message.recipients, message.cc, message.subject, message.body_text,
                  message.headers, message.label_ids, message.sent_at`
     );
     const row = result.rows[0];
@@ -41,6 +43,7 @@ export class EmailCardRepository {
       messageDatabaseId: row.id,
       messageExternalId: row.external_id,
       threadId: row.thread_id,
+      threadExternalId: row.thread_external_id,
       sender: row.sender,
       recipients: row.recipients,
       cc: row.cc,
@@ -82,8 +85,9 @@ export class EmailCardRepository {
         `INSERT INTO actions (card_id, type, status, payload)
          VALUES ($1, 'gmail_send', 'pending', $2)`,
         [cardId, JSON.stringify({
-          threadId: mail.threadId,
-          inReplyToMessageId: mail.messageExternalId,
+          gmailThreadId: mail.threadExternalId,
+          inReplyTo: mail.headers['message-id'] ?? null,
+          references: [mail.headers.references, mail.headers['message-id']].filter(Boolean).join(' ') || null,
           to: [extractReplyAddress(mail.sender)],
           ...draft
         })]

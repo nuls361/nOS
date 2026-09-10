@@ -4,13 +4,17 @@ import { authenticate } from '@google-cloud/local-auth';
 import { google, type Auth } from 'googleapis';
 import { repoRoot } from '../env.js';
 
-const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
+const SCOPES = [
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/gmail.send'
+];
 const credentialsPath = resolve(repoRoot, process.env.GOOGLE_OAUTH_CREDENTIALS_PATH ?? './secrets/google-oauth-client.json');
 const tokenPath = resolve(repoRoot, process.env.GOOGLE_OAUTH_TOKEN_PATH ?? './secrets/google-oauth-token.json');
 
 const loadSavedCredentials = async (): Promise<Auth.OAuth2Client | null> => {
   try {
-    const credentials = JSON.parse(await readFile(tokenPath, 'utf8')) as Auth.JWTInput;
+    const credentials = JSON.parse(await readFile(tokenPath, 'utf8')) as Auth.JWTInput & { scopes?: string[] };
+    if (!SCOPES.every((scope) => credentials.scopes?.includes(scope))) return null;
     return google.auth.fromJSON(credentials) as Auth.OAuth2Client;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
@@ -37,7 +41,8 @@ export const authorizeGmail = async (interactive = false): Promise<Auth.OAuth2Cl
     type: 'authorized_user',
     client_id: oauth.client_id,
     client_secret: oauth.client_secret,
-    refresh_token: client.credentials.refresh_token
+    refresh_token: client.credentials.refresh_token,
+    scopes: SCOPES
   }, null, 2), { mode: 0o600 });
   return client;
 };

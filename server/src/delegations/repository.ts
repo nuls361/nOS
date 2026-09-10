@@ -7,28 +7,31 @@ export class DelegationRepository {
 
   async claimNext(): Promise<EmailWorkItem | null> {
     const result = await this.pool.query<{
-      id: string; external_id: string; thread_id: string; sender: string; recipients: string[];
+      id: string; external_id: string; thread_id: string; thread_external_id: string;
+      sender: string; recipients: string[];
       cc: string[]; subject: string | null; body_text: string; headers: Record<string, string>;
       label_ids: string[]; sent_at: Date;
     }>(
       `WITH candidate AS (
-         SELECT id FROM messages
-         WHERE direction = 'inbound'
-           AND (delegation_status = 'unprocessed'
-             OR (delegation_status = 'processing' AND delegation_started_at < now() - interval '30 minutes'))
-           AND sent_at >= (SELECT queue_start_at FROM email_queue_state WHERE key = 'inbound')
-         ORDER BY sent_at, id FOR UPDATE SKIP LOCKED LIMIT 1
+         SELECT message.id, thread.external_id AS thread_external_id FROM messages message
+         JOIN threads thread ON thread.id = message.thread_id
+         WHERE message.direction = 'inbound'
+           AND (message.delegation_status = 'unprocessed'
+             OR (message.delegation_status = 'processing' AND message.delegation_started_at < now() - interval '30 minutes'))
+           AND message.sent_at >= (SELECT queue_start_at FROM email_queue_state WHERE key = 'inbound')
+         ORDER BY message.sent_at, message.id FOR UPDATE SKIP LOCKED LIMIT 1
        )
        UPDATE messages message SET
          delegation_status = 'processing', delegation_started_at = now(), delegation_error = NULL
        FROM candidate WHERE message.id = candidate.id
        RETURNING message.id, message.external_id, message.thread_id, message.sender,
-                 message.recipients, message.cc, message.subject, message.body_text,
+                 candidate.thread_external_id, message.recipients, message.cc, message.subject, message.body_text,
                  message.headers, message.label_ids, message.sent_at`
     );
     const row = result.rows[0];
     return row ? {
       messageDatabaseId: row.id, messageExternalId: row.external_id, threadId: row.thread_id,
+      threadExternalId: row.thread_external_id,
       sender: row.sender, recipients: row.recipients, cc: row.cc, subject: row.subject,
       body: row.body_text, headers: row.headers, labelIds: row.label_ids, sentAt: row.sent_at
     } : null;

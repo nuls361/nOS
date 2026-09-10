@@ -3,7 +3,8 @@ import type { EmailWorkItem } from '../emails/types.js';
 import { DelegationPipeline } from './pipeline.js';
 
 const mail = (sender = 'Campaign Partner <partner@example.com>'): EmailWorkItem => ({
-  messageDatabaseId: 'mail-db', messageExternalId: 'gmail-8', threadId: 'thread-db', sender,
+  messageDatabaseId: 'mail-db', messageExternalId: 'gmail-8', threadId: 'thread-db',
+  threadExternalId: 'gmail-thread', sender,
   recipients: ['niels@songpush.com'], cc: [], subject: 'Campaign assets needed',
   body: 'Can you coordinate the missing assets?', headers: {}, labelIds: ['INBOX'], sentAt: new Date()
 });

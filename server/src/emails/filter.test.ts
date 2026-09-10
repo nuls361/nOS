@@ -6,6 +6,7 @@ const mail = (overrides: Partial<EmailWorkItem> = {}): EmailWorkItem => ({
   messageDatabaseId: 'db-message',
   messageExternalId: 'gmail-message',
   threadId: 'thread',
+  threadExternalId: 'gmail-thread',
   sender: 'Karla Kunde <karla@example.com>',
   recipients: ['niels@songpush.com'],
   cc: [],

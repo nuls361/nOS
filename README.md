@@ -85,6 +85,19 @@ historischen Sent-Forwards und vollständigen Threads. Nur bei belastbarer Zuord
 entsteht eine Delegationskarte mit einem `pending`-Forward-Briefing und optional einem
 separaten `pending`-Attio-Task; es wird nichts automatisch versendet oder verändert.
 
+### Freigegebene Aktionen ausführen
+
+`pnpm actions:execute` verarbeitet ausschließlich Aktionen mit Status `approved`,
+gesetztem `approved_at` und `approved_by`. Gmail-Antworten verwenden Gmail-Thread-ID,
+`In-Reply-To` und `References`; Forwards lösen Teamnamen über `TEAM_EMAILS_JSON` auf.
+Attio-Mitglieder werden über `ATTIO_MEMBER_IDS_JSON` aufgelöst. Start, vollständiger
+freigegebener Inhalt, Ergebnis oder Fehler landen unveränderlich im `audit_log`.
+Ein unterbrochener `executing`-Datensatz wird bewusst nicht automatisch wiederholt,
+weil ein Blind-Retry eine Mail oder einen CRM-Write doppelt ausführen könnte.
+Da der Versand den zusätzlichen Gmail-Scope `gmail.send` benötigt, muss nach diesem
+Update einmalig `pnpm gmail:auth` ausgeführt werden; alte Read-only-Tokens werden
+bewusst nicht als sendefähig akzeptiert.
+
 > Revidierter Plan, Stand 08.09.2026 — ersetzt den ursprünglichen „Jarvis"-Projektplan
 > (mobile-first Entscheidungs-Cockpit mit Projekt-Tabs). Begründung der Kürzungen: siehe unten.
 

@@ -4,7 +4,8 @@ import { EmailCardPipeline } from './pipeline.js';
 import type { EmailWorkItem } from './types.js';
 
 const workItem = (sender = 'Karla <karla@example.com>'): EmailWorkItem => ({
-  messageDatabaseId: 'message-db', messageExternalId: 'gmail-1', threadId: 'thread-db', sender,
+  messageDatabaseId: 'message-db', messageExternalId: 'gmail-1', threadId: 'thread-db',
+  threadExternalId: 'gmail-thread', sender,
   recipients: ['niels@songpush.com'], cc: [], subject: 'Angebot', body: 'Was kostet das?',
   headers: {}, labelIds: ['INBOX'], sentAt: new Date()
 });

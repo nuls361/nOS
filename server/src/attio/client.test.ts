@@ -56,4 +56,36 @@ describe('HttpAttioClient', () => {
     expect(transcript.transcript).toHaveLength(2);
     expect(transcript.web_url).toBe('https://attio.test/call');
   });
+
+  it('updates one record field with the documented values envelope', async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(response({
+      data: { id: { record_id: 'record-1', workspace_id: 'workspace' }, values: {} }
+    }));
+    const client = new HttpAttioClient('secret', 'https://attio.test/v2', request);
+    await expect(client.updateRecord({
+      objectSlug: 'companies', recordId: 'record-1', field: 'status', value: 'active'
+    })).resolves.toEqual({ recordId: 'record-1' });
+    expect(request).toHaveBeenCalledWith(
+      'https://attio.test/v2/objects/companies/records/record-1',
+      expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ data: { values: { status: 'active' } } }) })
+    );
+  });
+
+  it('creates a plaintext task with all required Attio fields', async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(response({
+      data: { id: { task_id: 'task-1' } }
+    }));
+    const client = new HttpAttioClient('secret', 'https://attio.test/v2', request);
+    await expect(client.createTask({
+      title: 'Follow up', description: 'Contact customer', assigneeId: 'member-1',
+      objectSlug: 'companies', recordId: 'record-1'
+    })).resolves.toEqual({ taskId: 'task-1' });
+    const body = JSON.parse(String(request.mock.calls[0]?.[1]?.body)) as { data: Record<string, unknown> };
+    expect(body.data).toEqual(expect.objectContaining({
+      content: 'Follow up\n\nContact customer', format: 'plaintext', deadline_at: null,
+      is_completed: false,
+      assignees: [{ referenced_actor_type: 'workspace-member', referenced_actor_id: 'member-1' }],
+      linked_records: [{ target_object: 'companies', target_record_id: 'record-1' }]
+    }));
+  });
 });

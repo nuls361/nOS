@@ -4,6 +4,7 @@ export interface EmailWorkItem {
   messageDatabaseId: string;
   messageExternalId: string;
   threadId: string;
+  threadExternalId: string;
   sender: string;
   recipients: string[];
   cc: string[];
