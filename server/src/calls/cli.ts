@@ -11,7 +11,11 @@ const pool = createPool();
 try {
   const repository = new CallCardRepository(pool);
   const generator = createCallCardGenerator(new ContextRepository(pool));
-  const result = await new CallCardPipeline(repository, generator).processAll();
+  // Begrenzt, damit ein Cron-Lauf im Zeitfenster der Function bleibt.
+  const limitArgument = process.argv.find((value) => value.startsWith('--limit='))?.split('=')[1];
+  const limit = limitArgument === undefined ? 20 : Number(limitArgument);
+  if (!Number.isInteger(limit) || limit < 1) throw new Error('--limit must be a positive integer');
+  const result = await new CallCardPipeline(repository, generator).processAll(limit);
   console.info(JSON.stringify(result));
 } finally {
   await pool.end();

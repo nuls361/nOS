@@ -21,6 +21,10 @@ export const callCardSchema = z.object({
     field: z.string().min(1),
     currentValue: z.unknown(),
     proposedValue: z.unknown(),
+    // Nur echte Änderungen dürfen zu einer freigebbaren Aktion werden. Ohne
+    // dieses Flag hängt das Modell Hinweise wie "(keine Änderung)" an den Wert
+    // — freigegeben landet genau dieser Text im CRM.
+    changesValue: z.boolean(),
     rationale: z.string().min(1),
     citations
   })),

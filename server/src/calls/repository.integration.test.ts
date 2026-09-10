@@ -60,7 +60,14 @@ describe('CallCardRepository', () => {
       },
       attioUpdates: [{
         objectSlug: 'deals', recordId: 'deal-1', field: 'status', currentValue: 'open',
-        proposedValue: 'won', rationale: 'Agreed in call', citations: [{ sourceId: source, reason: 'Agreement' }]
+        proposedValue: 'won', changesValue: true, rationale: 'Agreed in call',
+        citations: [{ sourceId: source, reason: 'Agreement' }]
+      }, {
+        // Reine Bestätigung: darf KEINE freigebbare Schreibaktion erzeugen, sonst
+        // landet ein "unveränderter" Wert als echter CRM-Write in der Warteschlange.
+        objectSlug: 'deals', recordId: 'deal-1', field: 'value', currentValue: '5000 EUR',
+        proposedValue: '5000 EUR', changesValue: false, rationale: 'Wert stimmt bereits',
+        citations: [{ sourceId: source, reason: 'Budget im Call bestätigt' }]
       }],
       delegation: {
         to: 'Lina', subject: 'Briefing', body: 'Please follow up',
@@ -72,6 +79,7 @@ describe('CallCardRepository', () => {
       }
     };
     const created = await repository.createCard(claimed, proposal);
+    // 4 Aktionen, nicht 5: die Bestätigung wird gefiltert.
     expect(created).toEqual(expect.objectContaining({ actionCount: 4, existing: false }));
 
     const actions = await pool.query<{ type: string; status: string }>(

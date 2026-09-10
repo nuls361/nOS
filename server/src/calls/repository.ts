@@ -95,7 +95,11 @@ export class CallCardRepository {
 
       const actions: Array<{ type: string; payload: unknown }> = [
         { type: 'gmail_send', payload: proposal.followUpEmail },
-        ...proposal.attioUpdates.map((payload) => ({ type: 'attio_update', payload })),
+        // Bestätigungen ("Wert stimmt bereits") bleiben im Karten-Payload sichtbar,
+        // werden aber nicht zu einer freigebbaren Schreibaktion.
+        ...proposal.attioUpdates
+          .filter((update) => update.changesValue)
+          .map((payload) => ({ type: 'attio_update', payload })),
         ...(proposal.delegation ? [{ type: 'gmail_forward', payload: proposal.delegation }] : []),
         ...(proposal.task ? [{ type: 'attio_task', payload: proposal.task }] : [])
       ];
