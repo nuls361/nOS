@@ -5,6 +5,14 @@ export class ActionRepository {
   constructor(private readonly pool: Pool) {}
 
   async claimNext(): Promise<ActionWorkItem | null> {
+    return this.claim();
+  }
+
+  async claimById(id: string): Promise<ActionWorkItem | null> {
+    return this.claim(id);
+  }
+
+  private async claim(id?: string): Promise<ActionWorkItem | null> {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -14,12 +22,14 @@ export class ActionRepository {
         `WITH candidate AS (
            SELECT id FROM actions
            WHERE status = 'approved' AND approved_at IS NOT NULL AND approved_by IS NOT NULL
+             AND ($1::uuid IS NULL OR id = $1)
            ORDER BY approved_at, id
            FOR UPDATE SKIP LOCKED LIMIT 1
          )
          UPDATE actions action SET status = 'executing', error = NULL, updated_at = now()
          FROM candidate WHERE action.id = candidate.id
-         RETURNING action.id, action.type, action.payload, action.approved_at, action.approved_by`
+         RETURNING action.id, action.type, action.payload, action.approved_at, action.approved_by`,
+        [id ?? null]
       );
       const row = result.rows[0];
       if (!row) {
@@ -63,6 +73,12 @@ export class ActionRepository {
           approvedAt: action.approvedAt.toISOString(), approvedBy: action.approvedBy,
           type: action.type, payload: action.payload, result
         })]
+      );
+      await client.query(
+        `UPDATE cards card SET status = 'completed', updated_at = now()
+         FROM actions source WHERE source.id = $1 AND card.id = source.card_id
+           AND NOT EXISTS (SELECT 1 FROM actions remaining WHERE remaining.card_id = card.id
+             AND remaining.status IN ('pending', 'approved', 'executing'))`, [action.id]
       );
       await client.query('COMMIT');
     } catch (error) {

@@ -77,12 +77,9 @@ ohne KI-Aufruf übersprungen. Für relevante externe menschliche Mails entsteht 
 offene Karte mit einem Antwortentwurf als `pending`-Aktion; Preise, Zusagen und andere
 unsichere Details bleiben als sichtbare Platzhalter zur manuellen Freigabe markiert.
 
-### Delegationskarten
-
-`pnpm delegations:process` bewertet neue relevante externe Mails unabhängig von der
-Antwortkarten-Pipeline. Der Agent lernt das Routing zu Lina, Noah oder Robert aus
-historischen Sent-Forwards und vollständigen Threads. Nur bei belastbarer Zuordnung
-entsteht eine Delegationskarte mit einem `pending`-Forward-Briefing und optional einem
+Im selben Agentenlauf wird eine mögliche Delegation an Lina, Noah oder Robert aus
+historischen Sent-Forwards und vollständigen Threads abgeleitet. Nur bei belastbarer
+Zuordnung ergänzt dieselbe Karte ein `pending`-Forward-Briefing und optional einen
 separaten `pending`-Attio-Task; es wird nichts automatisch versendet oder verändert.
 
 ### Freigegebene Aktionen ausführen
@@ -97,6 +94,16 @@ weil ein Blind-Retry eine Mail oder einen CRM-Write doppelt ausführen könnte.
 Da der Versand den zusätzlichen Gmail-Scope `gmail.send` benötigt, muss nach diesem
 Update einmalig `pnpm gmail:auth` ausgeführt werden; alte Read-only-Tokens werden
 bewusst nicht als sendefähig akzeptiert.
+
+### Web-Arbeitsraum
+
+Die Web-App zeigt nach dem Single-User-Login einen nach Dringlichkeit sortierten
+Kartenstrom. Aktionen lassen sich einzeln editieren, freigeben oder verwerfen;
+ganze Karten können bis morgen zurückgestellt oder verworfen werden. Freigeben
+ruft ausschließlich die exakt gewählte Aktion im Action-Layer auf. Dafür müssen
+`APP_PASSWORD` (mindestens 12 Zeichen) und `SESSION_SECRET` (mindestens 32 Zeichen)
+gesetzt sein. Die Session liegt in einem signierten, `HttpOnly`, `SameSite=Strict`
+Cookie; in Produktion zusätzlich `Secure`.
 
 > Revidierter Plan, Stand 08.09.2026 — ersetzt den ursprünglichen „Jarvis"-Projektplan
 > (mobile-first Entscheidungs-Cockpit mit Projekt-Tabs). Begründung der Kürzungen: siehe unten.

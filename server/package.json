@@ -17,7 +17,7 @@
     "actions:execute": "tsx src/actions/cli.ts",
     "lint": "eslint src",
     "test": "vitest run src --exclude '**/*.integration.test.ts'",
-    "test:db": "DATABASE_URL=\"${DATABASE_URL_TEST:-postgres://nos:nos@localhost:5432/nos}\" vitest run --no-file-parallelism src/db/schema.integration.test.ts src/attio/repository.integration.test.ts src/agent/context-repository.integration.test.ts src/calls/repository.integration.test.ts src/emails/repository.integration.test.ts src/actions/repository.integration.test.ts",
+    "test:db": "DATABASE_URL=\"${DATABASE_URL_TEST:-postgres://nos:nos@localhost:5432/nos}\" vitest run --no-file-parallelism src/db/schema.integration.test.ts src/attio/repository.integration.test.ts src/agent/context-repository.integration.test.ts src/calls/repository.integration.test.ts src/emails/repository.integration.test.ts src/actions/repository.integration.test.ts src/workspace/repository.integration.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "attio:records": "tsx src/attio/cli.ts --records"
   },

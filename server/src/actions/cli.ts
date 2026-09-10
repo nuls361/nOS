@@ -1,52 +1,12 @@
 import '../env.js';
-import { google } from 'googleapis';
-import { HttpAttioClient } from '../attio/client.js';
 import { migrate } from '../db/migrate.js';
 import { createPool } from '../db/pool.js';
-import { authorizeGmail } from '../gmail/auth.js';
-import { GoogleGmailClient } from '../gmail/google-client.js';
-import { ActionExecutor } from './executor.js';
-import { ActionRepository } from './repository.js';
-
-const parseMap = (name: string): Record<string, string> => {
-  const raw = process.env[name];
-  if (!raw) return {};
-  const value = JSON.parse(raw) as unknown;
-  if (!value || typeof value !== 'object' || Array.isArray(value)
-    || Object.values(value).some((entry) => typeof entry !== 'string')) {
-    throw new Error(`${name} must be a JSON object with string values`);
-  }
-  return value as Record<string, string>;
-};
+import { createActionExecutor } from './runtime.js';
 
 await migrate();
 const pool = createPool();
 try {
-  let gmailClient: GoogleGmailClient | undefined;
-  const gmail = {
-    send: async (input: Parameters<GoogleGmailClient['send']>[0]) => {
-      if (!gmailClient) {
-        const auth = await authorizeGmail();
-        gmailClient = new GoogleGmailClient(google.gmail({ version: 'v1', auth }));
-      }
-      return gmailClient.send(input);
-    }
-  };
-  let attioClient: HttpAttioClient | undefined;
-  const getAttio = (): HttpAttioClient => {
-    attioClient ??= new HttpAttioClient(
-      process.env.ATTIO_API_KEY ?? '', process.env.ATTIO_API_BASE_URL ?? 'https://api.attio.com/v2'
-    );
-    return attioClient;
-  };
-  const attio = {
-    updateRecord: (input: Parameters<HttpAttioClient['updateRecord']>[0]) => getAttio().updateRecord(input),
-    createTask: (input: Parameters<HttpAttioClient['createTask']>[0]) => getAttio().createTask(input)
-  };
-  const executor = new ActionExecutor(
-    new ActionRepository(pool), gmail, attio,
-    parseMap('TEAM_EMAILS_JSON'), parseMap('ATTIO_MEMBER_IDS_JSON')
-  );
+  const executor = createActionExecutor(pool);
   console.info(JSON.stringify({ processed: await executor.processAll() }));
 } finally {
   await pool.end();

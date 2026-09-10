@@ -4,7 +4,8 @@ import {
   gmailSendPayloadSchema, type ActionWorkItem, type AttioWriter, type GmailWriter
 } from './types.js';
 
-type Queue = Pick<ActionRepository, 'claimNext' | 'markExecuted' | 'markFailed' | 'markBookkeepingFailed'>;
+type Queue = Pick<ActionRepository,
+  'claimNext' | 'claimById' | 'markExecuted' | 'markFailed' | 'markBookkeepingFailed'>;
 
 const asRecipients = (value: string | string[]): string[] => Array.isArray(value) ? value : [value];
 const validateRecipients = (values: string[]): string[] =>
@@ -71,12 +72,25 @@ export class ActionExecutor {
     const action = await this.repository.claimNext();
     if (!action) return false;
 
+    await this.processClaimed(action);
+    return true;
+  }
+
+  async processAction(id: string): Promise<boolean> {
+    const action = await this.repository.claimById(id);
+    if (!action) return false;
+
+    await this.processClaimed(action);
+    return true;
+  }
+
+  private async processClaimed(action: ActionWorkItem): Promise<void> {
     let result: unknown;
     try {
       result = await this.execute(action);
     } catch (error) {
       await this.repository.markFailed(action, error);
-      return true;
+      return;
     }
 
     // Ab hier ist die Aktion passiert und nicht mehr ruecknehmbar. Schlaegt nur
@@ -87,7 +101,6 @@ export class ActionExecutor {
     } catch (error) {
       await this.repository.markBookkeepingFailed(action, result, error);
     }
-    return true;
   }
 
   async processAll(limit = 50): Promise<number> {
