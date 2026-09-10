@@ -93,6 +93,8 @@ export class OpenRouterMailCardGenerator implements MailCardGenerator {
   async generate(mail: EmailWorkItem): Promise<MailCardProposal> {
     const currentSource = `mail:${mail.messageDatabaseId}`;
     const observed = new Set([currentSource]);
+    const approvedPlaybook = await this.context.readPlaybook();
+    approvedPlaybook.forEach(({ sourceId }) => observed.add(sourceId));
     const submit = tool({
       description: 'Submit the finished mail card exactly once, as the final step.',
       inputSchema: mailCardSchema,
@@ -106,7 +108,8 @@ export class OpenRouterMailCardGenerator implements MailCardGenerator {
         sourceId: currentSource,
         from: extractEmailAddress(mail.sender),
         subject: mail.subject,
-        body: mail.body
+        body: mail.body,
+        approvedPlaybook
       }),
       tools: { ...createContextTools(this.context, observed), submit_mail_card: submit },
       stopWhen: [hasToolCall('submit_mail_card'), stepCountIs(10)]

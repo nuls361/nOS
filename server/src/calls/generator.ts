@@ -39,6 +39,8 @@ export class OpenRouterCallCardGenerator implements CallCardGenerator {
   async generate(workItem: CallWorkItem): Promise<CallCardProposal> {
     const callSource = `call:${workItem.callRecordingId}`;
     const observed = new Set([callSource]);
+    const approvedPlaybook = await this.context.readPlaybook();
+    approvedPlaybook.forEach(({ sourceId }) => observed.add(sourceId));
     // Das Ergebnis kommt als Tool-Call, nicht über Output.object: bei einem
     // Schema dieser Größe liefert das Modell über OpenRouter sonst Markdown-Prosa
     // statt JSON, und der ganze (teure) Lauf ist verloren. Tool-Calling ist der
@@ -57,7 +59,8 @@ export class OpenRouterCallCardGenerator implements CallCardGenerator {
         meeting: { id: workItem.meetingId, title: workItem.meetingTitle },
         participants: workItem.participants,
         linkedRecords: workItem.linkedRecords,
-        transcript: workItem.rawTranscript
+        transcript: workItem.rawTranscript,
+        approvedPlaybook
       }),
       tools: { ...createContextTools(this.context, observed), submit_card: submitCard },
       stopWhen: [hasToolCall('submit_card'), stepCountIs(10)]

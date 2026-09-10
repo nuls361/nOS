@@ -18,10 +18,12 @@ const api = async (path: string, init?: RequestInit) => {
 };
 
 const typeLabel: Record<string, string> = {
-  call_followup: 'Call-Nachbereitung', email_reply: 'Antwortentwurf', delegation: 'Delegation'
+  call_followup: 'Call-Nachbereitung', email_reply: 'Antwortentwurf', delegation: 'Delegation',
+  playbook_update: 'Playbook-Vorschlag'
 };
 const actionLabel: Record<string, string> = {
-  gmail_send: 'E-Mail', gmail_forward: 'Weiterleitung', attio_update: 'Attio-Änderung', attio_task: 'Attio-Aufgabe'
+  gmail_send: 'E-Mail', gmail_forward: 'Weiterleitung', attio_update: 'Attio-Änderung',
+  attio_task: 'Attio-Aufgabe', playbook_upsert: 'Playbook aktualisieren'
 };
 const urgencyLabel = (value: number) => value >= 70 ? 'Heute' : value >= 50 ? 'Demnächst' : 'Wenn Zeit ist';
 const strings = (value: unknown): string => Array.isArray(value) ? value.join(', ') : String(value ?? '');
@@ -95,6 +97,7 @@ function ActionEditor({ action, onDone }: { action: Action; onDone: () => Promis
   const isMail = action.type === 'gmail_send' || action.type === 'gmail_forward';
   const isUpdate = action.type === 'attio_update';
   const isTask = action.type === 'attio_task';
+  const isPlaybook = action.type === 'playbook_upsert';
   return <article className="action-block">
     <header className="action-head">
       <span>{actionLabel[action.type] ?? action.type}</span>
@@ -116,6 +119,11 @@ function ActionEditor({ action, onDone }: { action: Action; onDone: () => Promis
       <label>Aufgabe<input disabled={!editing} value={strings(payload.title)} onChange={(e) => set('title', e.target.value)} /></label>
       <label>Beschreibung<textarea disabled={!editing} rows={4} value={strings(payload.description)} onChange={(e) => set('description', e.target.value)} /></label>
       <label>Zuständig<input disabled={!editing} value={strings(payload.assignee)} onChange={(e) => set('assignee', e.target.value || null)} /></label>
+    </div>}
+    {isPlaybook && <div className="draft-paper">
+      <label>Dateiname<input disabled={!editing} value={strings(payload.slug)} onChange={(e) => set('slug', e.target.value)} /></label>
+      <label>Titel<input disabled={!editing} value={strings(payload.title)} onChange={(e) => set('title', e.target.value)} /></label>
+      <label>Markdown<textarea disabled={!editing} rows={12} value={strings(payload.markdown)} onChange={(e) => set('markdown', e.target.value)} /></label>
     </div>}
     {action.error && <p className="form-error">{action.error}</p>}
     {error && <p className="form-error" role="alert">{error}</p>}

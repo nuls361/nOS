@@ -1,7 +1,8 @@
 import type { ActionRepository } from './repository.js';
 import {
   attioTaskPayloadSchema, attioUpdatePayloadSchema, gmailForwardPayloadSchema,
-  gmailSendPayloadSchema, type ActionWorkItem, type AttioWriter, type GmailWriter
+  gmailSendPayloadSchema, playbookUpsertPayloadSchema, type ActionWorkItem, type AttioWriter,
+  type GmailWriter, type PlaybookWriter
 } from './types.js';
 
 type Queue = Pick<ActionRepository,
@@ -21,7 +22,8 @@ export class ActionExecutor {
     private readonly gmail: GmailWriter,
     private readonly attio: AttioWriter,
     private readonly teamRecipients: Record<string, string>,
-    private readonly attioAssignees: Record<string, string>
+    private readonly attioAssignees: Record<string, string>,
+    private readonly playbook: PlaybookWriter = { upsert: async () => { throw new Error('Playbook writer unavailable'); } }
   ) {}
 
   private async execute(action: ActionWorkItem): Promise<unknown> {
@@ -64,6 +66,10 @@ export class ActionExecutor {
           ...(payload.objectSlug ? { objectSlug: payload.objectSlug } : {}),
           ...(payload.recordId ? { recordId: payload.recordId } : {})
         });
+      }
+      case 'playbook_upsert': {
+        const payload = playbookUpsertPayloadSchema.parse(action.payload);
+        return this.playbook.upsert(payload);
       }
     }
   }

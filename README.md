@@ -60,7 +60,18 @@ pnpm draft -- "Kunde fragt nach Zahlung auf Rechnung"
 
 Der Agent kann ausschließlich die fünf Read-only-Tools `search_mail`,
 `read_thread`, `search_calls`, `read_attio` und `read_playbook` verwenden.
-Quellenangaben werden gegen tatsächlich gelesene Tool-Ergebnisse validiert.
+Das gesamte freigegebene Playbook wird zusätzlich bei jedem Lauf fest in den
+Kontext geladen; Quellenangaben werden gegen tatsächlich gelesene Ergebnisse validiert.
+
+### Playbook-Feedback-Loop
+
+`pnpm playbook:mine` destilliert neue Paare aus der Sent-Historie sowie jeden
+freigegebenen Antworttext in wiederverwendbare Markdown-Vorschläge. Der Job ist für
+einen wöchentlichen Cron-Lauf gedacht und verarbeitet jede Quelle genau einmal.
+Kundenspezifische oder nicht verallgemeinerbare Beispiele werden protokolliert und
+übersprungen. Geeignete Änderungen erscheinen als `playbook_update`-Karte: Slug,
+Titel und Markdown lassen sich editieren und werden erst durch die einzeln bestätigte
+`playbook_upsert`-Aktion in `playbook_entries` übernommen.
 
 ### Call-Nachbereitung
 

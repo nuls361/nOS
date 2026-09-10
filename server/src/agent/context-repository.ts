@@ -13,6 +13,13 @@ export interface MailSearchResult {
   rank: number;
 }
 
+export interface PlaybookEntry {
+  sourceId: string;
+  slug: string;
+  title: string;
+  content: string;
+}
+
 export class ContextRepository {
   constructor(private readonly pool: Pool) {}
 
@@ -103,7 +110,7 @@ export class ContextRepository {
     return row ? { sourceId: `attio:${row.object_slug}:${row.record_id}`, ...row } : null;
   }
 
-  async readPlaybook(query?: string): Promise<unknown[]> {
+  async readPlaybook(query?: string): Promise<PlaybookEntry[]> {
     const result = query
       ? await this.pool.query<{ slug: string; title: string; content: string }>(
         `SELECT slug, title, content FROM playbook_entries

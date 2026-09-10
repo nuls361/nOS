@@ -18,7 +18,8 @@ describe('ActionExecutor', () => {
       action('attio_task', {
         title: 'Nachfassen', description: 'Kunden kontaktieren', assignee: 'Noah', dueDate: null,
         objectSlug: 'deals', recordId: 'deal-1'
-      })
+      }),
+      action('playbook_upsert', { slug: 'payment-terms', title: 'Payment terms', markdown: '# Terms' })
     ];
     const repository = {
       claimNext: vi.fn().mockImplementation(async () => actions.shift() ?? null),
@@ -29,10 +30,11 @@ describe('ActionExecutor', () => {
       updateRecord: vi.fn().mockResolvedValue({ recordId: 'record-1' }),
       createTask: vi.fn().mockResolvedValue({ taskId: 'task-1' })
     };
+    const playbook = { upsert: vi.fn().mockResolvedValue({ slug: 'payment-terms' }) };
     const executor = new ActionExecutor(
-      repository, gmail, attio, { Lina: 'lina@songpush.com' }, { Noah: 'member-noah' }
+      repository, gmail, attio, { Lina: 'lina@songpush.com' }, { Noah: 'member-noah' }, playbook
     );
-    await expect(executor.processAll()).resolves.toBe(4);
+    await expect(executor.processAll()).resolves.toBe(5);
     expect(gmail.send).toHaveBeenNthCalledWith(1, expect.objectContaining({
       to: ['kunde@example.com'], threadId: 'gmail-thread', inReplyTo: '<message@example.com>'
     }));
@@ -41,7 +43,8 @@ describe('ActionExecutor', () => {
       objectSlug: 'companies', recordId: 'record-1', field: 'status', value: 'active'
     });
     expect(attio.createTask).toHaveBeenCalledWith(expect.objectContaining({ assigneeId: 'member-noah' }));
-    expect(repository.markExecuted).toHaveBeenCalledTimes(4);
+    expect(playbook.upsert).toHaveBeenCalledWith({ slug: 'payment-terms', title: 'Payment terms', markdown: '# Terms' });
+    expect(repository.markExecuted).toHaveBeenCalledTimes(5);
     expect(repository.markFailed).not.toHaveBeenCalled();
   });
 

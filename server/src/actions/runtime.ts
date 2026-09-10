@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { HttpAttioClient } from '../attio/client.js';
 import { authorizeGmail } from '../gmail/auth.js';
 import { GoogleGmailClient } from '../gmail/google-client.js';
+import { PlaybookRepository } from '../playbook/repository.js';
 import { ActionExecutor } from './executor.js';
 import { ActionRepository } from './repository.js';
 
@@ -41,6 +42,6 @@ export const createActionExecutor = (pool: Pool): ActionExecutor => {
       updateRecord: (input) => getAttio().updateRecord(input),
       createTask: (input) => getAttio().createTask(input)
     },
-    parseMap('TEAM_EMAILS_JSON'), parseMap('ATTIO_MEMBER_IDS_JSON')
+    parseMap('TEAM_EMAILS_JSON'), parseMap('ATTIO_MEMBER_IDS_JSON'), new PlaybookRepository(pool)
   );
 };

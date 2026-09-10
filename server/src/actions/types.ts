@@ -36,7 +36,13 @@ export const attioTaskPayloadSchema = z.object({
   recordId: z.string().nullable()
 }).passthrough();
 
-export type ActionType = 'gmail_send' | 'gmail_forward' | 'attio_update' | 'attio_task';
+export const playbookUpsertPayloadSchema = z.object({
+  slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  title: z.string().min(1),
+  markdown: z.string().min(1)
+});
+
+export type ActionType = 'gmail_send' | 'gmail_forward' | 'attio_update' | 'attio_task' | 'playbook_upsert';
 
 export interface ActionWorkItem {
   id: string;
@@ -65,4 +71,8 @@ export interface AttioWriter {
     title: string; description: string; assigneeId?: string; dueDate?: string;
     objectSlug?: 'companies' | 'deals'; recordId?: string;
   }): Promise<{ taskId: string }>;
+}
+
+export interface PlaybookWriter {
+  upsert(input: { slug: string; title: string; markdown: string }): Promise<{ slug: string }>;
 }

@@ -20,6 +20,7 @@
     "calls:process": "pnpm --filter @nos/server calls:process",
     "emails:process": "pnpm --filter @nos/server emails:process",
     "actions:execute": "pnpm --filter @nos/server actions:execute",
+    "playbook:mine": "pnpm --filter @nos/server playbook:mine",
     "typecheck": "pnpm -r typecheck",
     "gmail:setup": "bash scripts/gmail-oauth-wizard.sh",
     "attio:records": "pnpm --filter @nos/server attio:records"

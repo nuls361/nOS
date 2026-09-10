@@ -45,6 +45,8 @@ export class DraftAgent {
   async draft(request: DraftRequest): Promise<Draft> {
     const observedSources = new Set<string>();
     const tools = createContextTools(this.repository, observedSources);
+    const approvedPlaybook = await this.repository.readPlaybook();
+    approvedPlaybook.forEach(({ sourceId }) => observedSources.add(sourceId));
     const { output } = await generateText({
       model: this.model,
       system: systemPrompt,
@@ -52,6 +54,7 @@ export class DraftAgent {
         `Task: ${request.instruction}`,
         request.contactEmail ? `Contact: ${request.contactEmail}` : '',
         request.threadId ? `Current thread ID: ${request.threadId}` : '',
+        `Approved playbook (always authoritative context): ${JSON.stringify(approvedPlaybook)}`,
         'Return a ready-to-review draft, not a sent message.'
       ].filter(Boolean).join('\n'),
       tools,
