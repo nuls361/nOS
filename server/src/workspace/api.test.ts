@@ -52,4 +52,26 @@ describe('workspace API', () => {
     expect((await app.inject({ method: 'POST', url: '/auth/login', payload: { password: 'wrong' } })).statusCode).toBe(401);
     await app.close();
   });
+
+  it('stops password guessing after repeated failures', async () => {
+    const app = buildApp(dependencies());
+    const attempt = () => app.inject({
+      method: 'POST', url: '/auth/login', payload: { password: 'falsch' }
+    });
+
+    for (let index = 0; index < 8; index += 1) {
+      expect((await attempt()).statusCode).toBe(401);
+    }
+    // Ab hier wird gar nicht mehr geprueft — sonst ist Durchprobieren auf einem
+    // oeffentlichen Endpunkt nur eine Frage der Zeit.
+    const blocked = await attempt();
+    expect(blocked.statusCode).toBe(429);
+
+    // Auch mit richtigem Passwort bleibt die Bremse aktiv.
+    const correct = await app.inject({
+      method: 'POST', url: '/auth/login', payload: { password: 'a-secure-password' }
+    });
+    expect(correct.statusCode).toBe(429);
+    await app.close();
+  });
 });

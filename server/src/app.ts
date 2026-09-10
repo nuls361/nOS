@@ -15,8 +15,46 @@ export interface AppDependencies {
 
 const unauthorized = (reply: FastifyReply) => reply.code(401).send({ error: 'unauthorized' });
 
+/**
+ * Ein einzelnes Passwort auf einem oeffentlich erreichbaren Endpunkt braucht
+ * eine Bremse, sonst ist Durchprobieren nur eine Frage der Zeit. Bewusst im
+ * Speicher gehalten: ein Single-User-Dienst mit einem Prozess braucht dafuer
+ * keinen zusaetzlichen Baustein.
+ */
+const maxFailures = 8;
+const windowMs = 15 * 60 * 1_000;
+
+export const createLoginThrottle = (now: () => number = Date.now) => {
+  const failures = new Map<string, { count: number; firstAt: number }>();
+  return {
+    blocked(key: string): boolean {
+      const entry = failures.get(key);
+      if (!entry) return false;
+      if (now() - entry.firstAt > windowMs) {
+        failures.delete(key);
+        return false;
+      }
+      return entry.count >= maxFailures;
+    },
+    recordFailure(key: string): void {
+      const entry = failures.get(key);
+      if (!entry || now() - entry.firstAt > windowMs) {
+        failures.set(key, { count: 1, firstAt: now() });
+        return;
+      }
+      entry.count += 1;
+    },
+    reset(key: string): void {
+      failures.delete(key);
+    }
+  };
+};
+
 export const buildApp = (dependencies?: AppDependencies): FastifyInstance => {
-  const app = Fastify({ logger: process.env.NODE_ENV !== 'test' });
+  // Hinter Caddy steht in request.ip sonst die Proxy-Adresse, und die Bremse
+  // wuerde alle Clients in einen Topf werfen.
+  const app = Fastify({ logger: process.env.NODE_ENV !== 'test', trustProxy: true });
+  const loginThrottle = createLoginThrottle();
   app.get('/health', async (request, reply) => {
     if (dependencies?.healthToken
       && request.headers.authorization !== `Bearer ${dependencies.healthToken}`) return unauthorized(reply);
@@ -39,9 +77,15 @@ export const buildApp = (dependencies?: AppDependencies): FastifyInstance => {
     return user?.email === dependencies.auth.userEmail ? { authenticated: true, email: user.email } : unauthorized(reply);
   });
   app.post<{ Body: { password?: string } }>('/auth/login', async (request, reply) => {
+    const client = request.ip;
+    if (loginThrottle.blocked(client)) {
+      return reply.code(429).send({ error: 'too_many_attempts' });
+    }
     if (!request.body?.password || !verifyPassword(request.body.password, dependencies.auth.password)) {
+      loginThrottle.recordFailure(client);
       return unauthorized(reply);
     }
+    loginThrottle.reset(client);
     setSessionCookie(reply, createSession(dependencies.auth.userEmail, dependencies.auth.sessionSecret),
       dependencies.auth.secureCookies);
     return { authenticated: true, email: dependencies.auth.userEmail };
