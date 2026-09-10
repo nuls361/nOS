@@ -90,18 +90,31 @@ export class AttioRepository {
   }
 
   async saveTranscript(recordingId: string, transcript: AttioTranscript): Promise<void> {
+    // Attio liefert für frisch beendete Calls zeitweise ein leeres Transkript.
+    // Solche Aufnahmen dürfen nicht als 'unprocessed' gelten, sonst baut die
+    // Kartenerzeugung eine Call-Nachbereitung ohne Inhalt. Sie bleiben
+    // 'awaiting_transcript' und ohne transcript_fetched_at, damit ein späterer
+    // Poll es erneut versucht, solange das Zeitfenster sie erfasst.
+    const hasContent = transcript.transcript.length > 0 || Boolean(transcript.raw_transcript?.trim());
     await this.pool.query(
       `UPDATE attio_call_recordings SET
          transcript_segments = $2,
          raw_transcript = $3,
          transcript_web_url = $4,
-         transcript_fetched_at = now(),
-         processing_status = 'unprocessed',
+         transcript_fetched_at = CASE WHEN $5 THEN now() ELSE transcript_fetched_at END,
+         processing_status = CASE WHEN $5 THEN 'unprocessed' ELSE 'awaiting_transcript' END,
          synced_at = now()
        WHERE call_recording_id = $1`,
       [recordingId, JSON.stringify(transcript.transcript), transcript.raw_transcript ?? null,
-        transcript.web_url ?? null]
+        transcript.web_url ?? null, hasContent]
     );
+  }
+
+  async getPollTime(): Promise<Date | null> {
+    const result = await this.pool.query<{ last_poll_at: Date }>(
+      "SELECT last_poll_at FROM attio_sync_state WHERE key = 'call_recordings'"
+    );
+    return result.rows[0]?.last_poll_at ?? null;
   }
 
   async savePollTime(time: Date): Promise<void> {

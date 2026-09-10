@@ -17,7 +17,8 @@
     "gmail:sync": "pnpm --filter @nos/server gmail:sync",
     "attio:sync": "pnpm --filter @nos/server attio:sync",
     "typecheck": "pnpm -r typecheck",
-    "gmail:setup": "bash scripts/gmail-oauth-wizard.sh"
+    "gmail:setup": "bash scripts/gmail-oauth-wizard.sh",
+    "attio:records": "pnpm --filter @nos/server attio:records"
   },
   "devDependencies": {
     "@eslint/js": "latest",

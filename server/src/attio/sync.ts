@@ -3,11 +3,15 @@ import type { AttioRepository } from './repository.js';
 import type { AttioClient } from './types.js';
 
 type AttioStore = Pick<AttioRepository,
-  'saveRecord' | 'saveMeeting' | 'saveRecording' | 'needsTranscript' | 'saveTranscript' | 'savePollTime'>;
+  'saveRecord' | 'saveMeeting' | 'saveRecording' | 'needsTranscript' | 'saveTranscript'
+  | 'savePollTime' | 'getPollTime'>;
 
-export interface AttioSyncResult {
+export interface AttioRecordSyncResult {
   companies: number;
   deals: number;
+}
+
+export interface AttioSyncResult {
   meetings: number;
   recordings: number;
   transcripts: number;
@@ -28,16 +32,30 @@ export class AttioSync {
     }
   }
 
+  /**
+   * Vollabzug der CRM-Records. Teuer: der Workspace hat >40k Companies, ein
+   * Durchlauf dauert Minuten. Gehört in einen eigenen, seltenen Cron-Lauf und
+   * darf den 15-Minuten-Poll der Aufnahmen nicht blockieren. Attio erlaubt
+   * weder Filter noch Sortierung auf updated_at, ein Delta ist also nicht möglich.
+   */
+  async syncRecords(): Promise<AttioRecordSyncResult> {
+    return { companies: await this.syncObject('companies'), deals: await this.syncObject('deals') };
+  }
+
+  /**
+   * Der 15-Minuten-Lauf: nur Meetings, Aufnahmen und Transkripte. Das Fenster
+   * beginnt beim letzten erfolgreichen Poll (mit Sicherheitsabstand), fällt auf
+   * lookbackHours zurück, solange es keinen Zustand gibt.
+   */
   async run(now = new Date(), lookbackHours = 24): Promise<AttioSyncResult> {
-    const result: AttioSyncResult = {
-      companies: await this.syncObject('companies'),
-      deals: await this.syncObject('deals'),
-      meetings: 0,
-      recordings: 0,
-      transcripts: 0
-    };
+    const result: AttioSyncResult = { meetings: 0, recordings: 0, transcripts: 0 };
+    const fallbackFrom = now.getTime() - lookbackHours * 60 * 60 * 1_000;
+    const lastPoll = await this.repository.getPollTime();
+    // Eine Stunde Überlappung: Transkripte erscheinen verzögert, und ein
+    // erneut gesehenes Meeting kostet nur einen Upsert.
+    const windowStart = lastPoll ? Math.min(lastPoll.getTime() - 3_600_000, now.getTime()) : fallbackFrom;
     const filters = {
-      endsFrom: new Date(now.getTime() - lookbackHours * 60 * 60 * 1_000).toISOString(),
+      endsFrom: new Date(windowStart).toISOString(),
       startsBefore: now.toISOString()
     };
     let meetingCursor: string | undefined;

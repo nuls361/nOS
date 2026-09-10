@@ -9,12 +9,14 @@ const repository = new AttioRepository(pool);
 const meetingId = randomUUID();
 const recordingId = randomUUID();
 const companyId = randomUUID();
+const emptyIds: string[] = [];
 
 beforeAll(async () => migrate());
 
 afterAll(async () => {
   await pool.query('DELETE FROM attio_meetings WHERE meeting_id = $1', [meetingId]);
   await pool.query("DELETE FROM attio_records WHERE object_slug = 'companies' AND record_id = $1", [companyId]);
+  if (emptyIds.length) await pool.query('DELETE FROM attio_meetings WHERE meeting_id = ANY($1::text[])', [emptyIds]);
   await pool.end();
 });
 
@@ -52,5 +54,33 @@ describe('AttioRepository', () => {
       object_slug: 'companies',
       record_id: companyId
     }]);
+  });
+
+  it('keeps empty transcripts awaiting instead of marking them ready', async () => {
+    const emptyMeetingId = randomUUID();
+    const emptyRecordingId = randomUUID();
+    emptyIds.push(emptyMeetingId);
+    const databaseMeetingId = await repository.saveMeeting({
+      id: { workspace_id: 'workspace', meeting_id: emptyMeetingId },
+      title: 'Short call',
+      end: { datetime: new Date().toISOString() },
+      linked_records: []
+    });
+    await repository.saveRecording(databaseMeetingId, {
+      id: { workspace_id: 'workspace', meeting_id: emptyMeetingId, call_recording_id: emptyRecordingId },
+      status: 'completed'
+    });
+
+    await repository.saveTranscript(emptyRecordingId, { transcript: [] });
+
+    const result = await pool.query(
+      `SELECT processing_status, transcript_fetched_at
+       FROM attio_call_recordings WHERE call_recording_id = $1`,
+      [emptyRecordingId]
+    );
+    expect(result.rows[0]?.processing_status).toBe('awaiting_transcript');
+    expect(result.rows[0]?.transcript_fetched_at).toBeNull();
+    // ...damit ein späterer Poll es erneut versucht.
+    expect(await repository.needsTranscript(emptyRecordingId)).toBe(true);
   });
 });

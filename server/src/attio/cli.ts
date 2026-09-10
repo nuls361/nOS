@@ -16,7 +16,12 @@ try {
   if (!Number.isFinite(lookbackHours) || lookbackHours <= 0) {
     throw new Error('ATTIO_MEETING_LOOKBACK_HOURS must be a positive number');
   }
-  const result = await new AttioSync(client, new AttioRepository(pool)).run(new Date(), lookbackHours);
+  const sync = new AttioSync(client, new AttioRepository(pool));
+  // --records: teurer CRM-Vollabzug (eigener, seltener Cron).
+  // Default: 15-Minuten-Poll für Meetings/Aufnahmen/Transkripte.
+  const result = process.argv.includes('--records')
+    ? await sync.syncRecords()
+    : await sync.run(new Date(), lookbackHours);
   console.info(JSON.stringify(result));
 } finally {
   await pool.end();
