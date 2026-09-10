@@ -1,0 +1,126 @@
+import type { Pool } from 'pg';
+import type { Draft } from '../agent/draft-agent.js';
+import type { EmailWorkItem } from './types.js';
+
+export interface CreatedEmailCard {
+  cardId: string;
+  existing: boolean;
+}
+
+export class EmailCardRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async claimNext(): Promise<EmailWorkItem | null> {
+    const result = await this.pool.query<{
+      id: string; external_id: string; thread_id: string; sender: string; recipients: string[];
+      cc: string[]; subject: string | null; body_text: string; headers: Record<string, string>;
+      label_ids: string[]; sent_at: Date;
+    }>(
+      `WITH candidate AS (
+         SELECT id FROM messages
+         WHERE direction = 'inbound'
+           AND (processing_status = 'unprocessed'
+             OR (processing_status = 'processing' AND processing_started_at < now() - interval '30 minutes'))
+         ORDER BY sent_at, id
+         FOR UPDATE SKIP LOCKED
+         LIMIT 1
+       )
+       UPDATE messages message SET
+         processing_status = 'processing', processing_started_at = now(), processing_error = NULL
+       FROM candidate WHERE message.id = candidate.id
+       RETURNING message.id, message.external_id, message.thread_id, message.sender,
+                 message.recipients, message.cc, message.subject, message.body_text,
+                 message.headers, message.label_ids, message.sent_at`
+    );
+    const row = result.rows[0];
+    return row ? {
+      messageDatabaseId: row.id,
+      messageExternalId: row.external_id,
+      threadId: row.thread_id,
+      sender: row.sender,
+      recipients: row.recipients,
+      cc: row.cc,
+      subject: row.subject,
+      body: row.body_text,
+      headers: row.headers,
+      labelIds: row.label_ids,
+      sentAt: row.sent_at
+    } : null;
+  }
+
+  async createCard(mail: EmailWorkItem, draft: Draft): Promise<CreatedEmailCard> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const inserted = await client.query<{ id: string }>(
+        `INSERT INTO cards (type, status, urgency, title, payload, sources, source_type, source_id)
+         VALUES ('email_reply', 'open', 50, $1, $2, $3, 'gmail_message', $4)
+         ON CONFLICT (source_type, source_id) WHERE source_type IS NOT NULL AND source_id IS NOT NULL
+         DO NOTHING RETURNING id`,
+        [mail.subject ? `Antwort: ${mail.subject}` : `Antwort an ${mail.sender}`,
+          JSON.stringify({ sender: mail.sender, draft }),
+          JSON.stringify([{ sourceId: `mail:${mail.messageDatabaseId}`, label: mail.subject }]),
+          mail.messageExternalId]
+      );
+      const cardId = inserted.rows[0]?.id;
+      if (!cardId) {
+        const existing = await client.query<{ id: string }>(
+          `SELECT id FROM cards WHERE source_type = 'gmail_message' AND source_id = $1`,
+          [mail.messageExternalId]
+        );
+        const existingCardId = existing.rows[0]?.id;
+        if (!existingCardId) throw new Error('Email card conflict without existing card');
+        await this.setStatus(client, mail.messageDatabaseId, 'processed');
+        await client.query('COMMIT');
+        return { cardId: existingCardId, existing: true };
+      }
+      await client.query(
+        `INSERT INTO actions (card_id, type, status, payload)
+         VALUES ($1, 'gmail_send', 'pending', $2)`,
+        [cardId, JSON.stringify({
+          threadId: mail.threadId,
+          inReplyToMessageId: mail.messageExternalId,
+          to: [extractReplyAddress(mail.sender)],
+          ...draft
+        })]
+      );
+      await this.setStatus(client, mail.messageDatabaseId, 'processed');
+      await client.query('COMMIT');
+      return { cardId, existing: false };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async markSkipped(id: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE messages SET processing_status = 'skipped', processing_error = NULL WHERE id = $1`, [id]
+    );
+  }
+
+  async markFailed(id: string, error: unknown): Promise<void> {
+    const message = error instanceof Error ? error.message : String(error);
+    await this.pool.query(
+      `UPDATE messages SET processing_status = 'failed', processing_error = $2 WHERE id = $1`,
+      [id, message.slice(0, 4_000)]
+    );
+  }
+
+  private async setStatus(
+    client: { query(query: string, values?: unknown[]): Promise<unknown> },
+    id: string,
+    status: 'processed'
+  ): Promise<void> {
+    await client.query(
+      `UPDATE messages SET processing_status = $2, processing_error = NULL WHERE id = $1`, [id, status]
+    );
+  }
+}
+
+const extractReplyAddress = (sender: string): string => {
+  const angle = /<([^<>]+)>/.exec(sender)?.[1];
+  return (angle ?? sender).trim();
+};

@@ -69,6 +69,14 @@ Call-Nachbereitungs-Karten. Follow-up-Mail, einzelne Attio-Feldänderungen,
 Delegations-Forward und Attio-Task werden als getrennte Aktionen im Status
 `pending` gespeichert. Der Prozess führt keine dieser Aktionen selbst aus.
 
+### Mail-Antwortkarten
+
+Nach dem Gmail-Poll verarbeitet `pnpm emails:process` neue eingehende Nachrichten.
+Interne SongPush-Mails, No-Reply-Absender, Newsletter und automatische Antworten werden
+ohne KI-Aufruf übersprungen. Für relevante externe menschliche Mails entsteht genau eine
+offene Karte mit einem Antwortentwurf als `pending`-Aktion; Preise, Zusagen und andere
+unsichere Details bleiben als sichtbare Platzhalter zur manuellen Freigabe markiert.
+
 > Revidierter Plan, Stand 08.09.2026 — ersetzt den ursprünglichen „Jarvis"-Projektplan
 > (mobile-first Entscheidungs-Cockpit mit Projekt-Tabs). Begründung der Kürzungen: siehe unten.
 
