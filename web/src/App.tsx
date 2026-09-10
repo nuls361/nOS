@@ -68,6 +68,17 @@ function ActionEditor({ action, onDone }: { action: Action; onDone: () => Promis
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const set = (key: string, value: unknown) => setPayload((current) => ({ ...current, [key]: value }));
+  // Empfänger brauchen eine eigene Behandlung: mehrere Adressen muessen als
+  // Liste ankommen, und bei Weiterleitungen wuerde sonst weiter der urspruenglich
+  // hinterlegte Kollege gewinnen — die Oberflaeche zeigte dann einen anderen
+  // Empfaenger an, als tatsaechlich angeschrieben wird.
+  const setRecipients = (raw: string) => setPayload((current) => {
+    const entries = raw.split(/[,;]/).map((entry) => entry.trim()).filter(Boolean);
+    const rest = { ...current };
+    delete rest.colleague;
+    const single = entries.length === 1 && !entries[0]!.includes('@');
+    return { ...rest, to: single ? entries[0]! : entries };
+  });
   const mutate = async (operation: 'save' | 'approve' | 'discard') => {
     setBusy(operation); setError('');
     try {
@@ -90,7 +101,7 @@ function ActionEditor({ action, onDone }: { action: Action; onDone: () => Promis
       <span className={`status status-${action.status}`}>{action.status}</span>
     </header>
     {isMail && <div className="draft-paper">
-      <label>Empfänger<input disabled={!editing} value={strings(payload.to ?? payload.colleague)} onChange={(e) => set('to', e.target.value)} /></label>
+      <label>Empfänger<input disabled={!editing} value={strings(payload.to ?? payload.colleague)} onChange={(e) => setRecipients(e.target.value)} /></label>
       <label>Betreff<input disabled={!editing} value={strings(payload.subject)} onChange={(e) => set('subject', e.target.value)} /></label>
       <label>Entwurf<textarea disabled={!editing} rows={8} value={strings(payload.body)} onChange={(e) => set('body', e.target.value)} /></label>
     </div>}

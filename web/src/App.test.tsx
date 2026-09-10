@@ -48,4 +48,38 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: 'Der Tisch ist frei.' })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/actions/action-1/approve', expect.objectContaining({ method: 'POST' }));
   });
+
+  it('replaces the mapped colleague when the forward recipient is edited', async () => {
+    const card = {
+      id: 'card-1', type: 'email_reply', status: 'open', urgency: 60, title: 'Angebot',
+      payload: {}, sources: [], createdAt: new Date().toISOString(),
+      actions: [{
+        id: 'action-1', type: 'gmail_forward', status: 'pending',
+        payload: { colleague: 'Lina', subject: 'Fwd: Angebot', body: 'Bitte übernehmen.' }
+      }]
+    };
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/auth/session') return json({ authenticated: true, email: 'niels@songpush.com' });
+      if (url === '/api/cards') return json([card]);
+      if (url === '/api/actions/action-1' && init?.method === 'PATCH') return json({ updated: true });
+      return json({});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Editieren' }));
+    fireEvent.change(screen.getByLabelText(/Empfänger/), { target: { value: 'noah@songpush.com' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Änderung sichern' }));
+
+    await waitFor(() => {
+      const patch = fetchMock.mock.calls.find(([url, init]) =>
+        url === '/api/actions/action-1' && (init as RequestInit | undefined)?.method === 'PATCH');
+      expect(patch).toBeDefined();
+      const sent = JSON.parse((patch![1] as RequestInit).body as string);
+      // Ohne das Entfernen von 'colleague' ginge die Mail weiter an Lina,
+      // waehrend die Oberflaeche Noah anzeigt.
+      expect(sent.payload.colleague).toBeUndefined();
+      expect(sent.payload.to).toEqual(['noah@songpush.com']);
+    });
+  });
 });
