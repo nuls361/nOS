@@ -15,6 +15,7 @@
     "db:migrate": "pnpm --filter @nos/server db:migrate",
     "gmail:auth": "pnpm --filter @nos/server gmail:auth",
     "gmail:sync": "pnpm --filter @nos/server gmail:sync",
+    "attio:sync": "pnpm --filter @nos/server attio:sync",
     "typecheck": "pnpm -r typecheck",
     "gmail:setup": "bash scripts/gmail-oauth-wizard.sh"
   },
