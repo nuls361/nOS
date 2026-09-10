@@ -1,0 +1,124 @@
+name: nos-production
+
+x-server-environment: &server-environment
+  NODE_ENV: production
+  PORT: 3000
+  APP_USER_EMAIL: ${APP_USER_EMAIL:-niels@songpush.com}
+  POSTGRES_HOST: postgres
+  POSTGRES_DB: ${POSTGRES_DB:-nos}
+  POSTGRES_USER: ${POSTGRES_USER:-nos}
+  POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+  APP_PASSWORD_FILE: /run/secrets/app_password
+  SESSION_SECRET_FILE: /run/secrets/session_secret
+  INTERNAL_HEALTH_TOKEN_FILE: /run/secrets/internal_health_token
+  OPENROUTER_API_KEY_FILE: /run/secrets/openrouter_api_key
+  ATTIO_API_KEY_FILE: /run/secrets/attio_api_key
+  GOOGLE_OAUTH_CREDENTIALS_PATH: /run/secrets/google_oauth_client
+  GOOGLE_OAUTH_TOKEN_PATH: /run/secrets/google_oauth_token
+  TEAM_EMAILS_JSON: ${TEAM_EMAILS_JSON:-{}}
+  ATTIO_MEMBER_IDS_JSON: ${ATTIO_MEMBER_IDS_JSON:-{}}
+
+x-server-secrets: &server-secrets
+  - postgres_password
+  - app_password
+  - session_secret
+  - internal_health_token
+  - openrouter_api_key
+  - attio_api_key
+  - google_oauth_client
+  - google_oauth_token
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nos}
+      POSTGRES_USER: ${POSTGRES_USER:-nos}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    restart: unless-stopped
+    environment: *server-environment
+    secrets: *server-secrets
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- --header=\"Authorization: Bearer $$(cat /run/secrets/internal_health_token)\" http://127.0.0.1:3000/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    command: ["node", "server/dist/worker/index.js"]
+    restart: unless-stopped
+    environment: *server-environment
+    secrets: *server-secrets
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        VITE_PUBLIC_ORIGIN: https://${DOMAIN}
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      server:
+        condition: service_healthy
+      web:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+
+secrets:
+  postgres_password:
+    file: ./secrets/production/postgres_password
+  app_password:
+    file: ./secrets/production/app_password
+  session_secret:
+    file: ./secrets/production/session_secret
+  internal_health_token:
+    file: ./secrets/production/internal_health_token
+  openrouter_api_key:
+    file: ./secrets/production/openrouter_api_key
+  attio_api_key:
+    file: ./secrets/production/attio_api_key
+  google_oauth_client:
+    file: ./secrets/production/google-oauth-client.json
+  google_oauth_token:
+    file: ./secrets/production/google-oauth-token.json

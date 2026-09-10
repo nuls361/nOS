@@ -10,13 +10,18 @@ export interface AppDependencies {
     'listCards' | 'updateAction' | 'approveAction' | 'discardAction' | 'snoozeCard' | 'discardCard'>;
   executor: Pick<ActionExecutor, 'processAction'>;
   auth: AuthConfig;
+  healthToken?: string | undefined;
 }
 
 const unauthorized = (reply: FastifyReply) => reply.code(401).send({ error: 'unauthorized' });
 
 export const buildApp = (dependencies?: AppDependencies): FastifyInstance => {
   const app = Fastify({ logger: process.env.NODE_ENV !== 'test' });
-  app.get('/health', async () => ({ status: 'ok' as const }));
+  app.get('/health', async (request, reply) => {
+    if (dependencies?.healthToken
+      && request.headers.authorization !== `Bearer ${dependencies.healthToken}`) return unauthorized(reply);
+    return { status: 'ok' as const };
+  });
   if (!dependencies) return app;
 
   const currentUser = (request: FastifyRequest) => readSession(request, dependencies.auth.sessionSecret);

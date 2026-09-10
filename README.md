@@ -29,6 +29,47 @@ pnpm build
 pnpm test:db
 ```
 
+## Produktion auf Hetzner
+
+Das Produktions-Setup läuft vollständig per Docker Compose: Caddy terminiert TLS,
+Nginx liefert die SPA aus, der Fastify-Server bleibt intern, Postgres besitzt keinen
+öffentlichen Port und ein einzelner Worker führt alle Polling- und Queue-Jobs aus.
+
+1. Einen Ubuntu-Server mit Docker Engine und Compose Plugin bereitstellen. Im DNS
+   einen A/AAAA-Record für `DOMAIN` auf den Server setzen; öffentlich benötigt werden
+   ausschließlich Port 80 und 443.
+2. Repository klonen und `.env.production.example` als `.env.production` kopieren.
+   Diese Datei enthält nur nicht geheime Konfiguration.
+3. Unter `secrets/production/` separate Dateien für `postgres_password`,
+   `app_password`, `session_secret`, `internal_health_token`, `openrouter_api_key`
+   und `attio_api_key` anlegen. Zufallswerte beispielsweise mit
+   `openssl rand -base64 48` erzeugen und das Verzeichnis auf Modus `700`, die
+   Dateien auf `600` setzen.
+4. `google-oauth-client.json` und das lokal nach `pnpm gmail:auth` erzeugte
+   `google-oauth-token.json` ebenfalls dort ablegen. OAuth besitzt ausschließlich
+   `gmail.readonly` und `gmail.send`; ein früher im Chat geteiltes Google-App-Passwort
+   muss vor dem Start im Google-Konto widerrufen werden und wird von nOS nicht genutzt.
+5. Für Attio einen eigenen Produktionsschlüssel nur mit
+   `record_permission:read`, `object_configuration:read`, `meeting:read` und
+   `call_recording:read` verwenden. Schreibzugriffe erfolgen über die vorhandenen,
+   einzeln freizugebenden Actions; falls Attio dafür zusätzliche granulare Scopes
+   verlangt, nur genau diese ergänzen.
+6. Starten und Updates einspielen:
+
+```bash
+docker compose --env-file .env.production -f compose.production.yaml up -d --build
+docker compose --env-file .env.production -f compose.production.yaml ps
+```
+
+Der Worker startet Gmail-Sync alle 30 Minuten, Attio-Sync alle 15 Minuten,
+Karten-Pipelines alle 5 Minuten, freigegebene Actions jede Minute und Playbook-Mining
+wöchentlich. Jobs laufen in einem Worker seriell und überlappen nicht. Docker-Secrets
+werden ausschließlich aus `/run/secrets` geladen; `.dockerignore` schließt Secrets
+und lokale Env-Dateien auch aus dem Build-Kontext aus. Der externe Zugriff erfolgt
+nur über HTTPS. Sämtliche Arbeitsraum-Endpunkte benötigen die signierte Session;
+`/api/health` benötigt zusätzlich den internen Bearer-Token, Login ist naturgemäß
+öffentlich.
+
 ### Gmail-Synchronisierung
 
 1. Gmail API im Google-Cloud-Projekt aktivieren und einen OAuth-Client vom Typ

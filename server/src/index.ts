@@ -21,7 +21,8 @@ const app = buildApp({
     sessionSecret: required('SESSION_SECRET', 32),
     userEmail: process.env.APP_USER_EMAIL ?? 'niels@songpush.com',
     secureCookies: config.nodeEnv === 'production'
-  }
+  },
+  healthToken: config.nodeEnv === 'production' ? required('INTERNAL_HEALTH_TOKEN', 32) : process.env.INTERNAL_HEALTH_TOKEN
 });
 app.addHook('onClose', async () => pool.end());
 

@@ -14,10 +14,20 @@ const dependencies = () => ({
   auth: {
     password: 'a-secure-password', sessionSecret: 's'.repeat(32),
     userEmail: 'niels@songpush.com', secureCookies: false
-  }
+  },
+  healthToken: 'h'.repeat(32)
 });
 
 describe('workspace API', () => {
+  it('protects the production readiness endpoint with its internal token', async () => {
+    const app = buildApp(dependencies());
+    expect((await app.inject({ method: 'GET', url: '/health' })).statusCode).toBe(401);
+    expect((await app.inject({
+      method: 'GET', url: '/health', headers: { authorization: `Bearer ${'h'.repeat(32)}` }
+    })).json()).toEqual({ status: 'ok' });
+    await app.close();
+  });
+
   it('protects cards and executes the exact action after approval', async () => {
     const deps = dependencies();
     const app = buildApp(deps);
