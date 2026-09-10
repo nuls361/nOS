@@ -108,7 +108,10 @@ export class HttpAttioClient implements AttioClient {
 
   async getTranscript(meetingId: string, recordingId: string): Promise<AttioTranscript> {
     const segments: AttioTranscriptSegment[] = [];
-    let rawTranscript: string | undefined;
+    // Jede Transkript-Seite bringt ihr EIGENES raw_transcript-Stück. Wird nur das
+    // erste behalten, fehlen bei einem einstündigen Call ~89% des Textes — und der
+    // Volltextindex sowie der Draft-Agent sehen nur die ersten Minuten.
+    const rawParts: string[] = [];
     let webUrl: string | undefined;
     let cursor: string | undefined;
     do {
@@ -119,11 +122,12 @@ export class HttpAttioClient implements AttioClient {
         `/meetings/${encodeURIComponent(meetingId)}/call_recordings/${encodeURIComponent(recordingId)}/transcript${suffix}`
       );
       segments.push(...response.data.transcript);
-      rawTranscript ??= response.data.raw_transcript ?? undefined;
+      if (response.data.raw_transcript) rawParts.push(response.data.raw_transcript);
       webUrl ??= response.data.web_url ?? undefined;
       cursor = response.pagination?.next_cursor ?? undefined;
     } while (cursor);
     const result: AttioTranscript = { transcript: segments };
+    const rawTranscript = rawParts.join('\n').trim();
     if (rawTranscript) result.raw_transcript = rawTranscript;
     if (webUrl) result.web_url = webUrl;
     return result;

@@ -35,4 +35,25 @@ describe('HttpAttioClient', () => {
     expect(transcript.transcript.map(({ speech }) => speech)).toEqual(['Hello', 'world']);
     expect(transcript.raw_transcript).toBe('Hello world');
   });
+
+  it('joins raw_transcript across every transcript page', async () => {
+    const request = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response({
+        data: { transcript: [{ speech: 'eins' }], raw_transcript: 'Teil eins', web_url: 'https://attio.test/call' },
+        pagination: { next_cursor: 'seite-2' }
+      }))
+      .mockResolvedValueOnce(response({
+        data: { transcript: [{ speech: 'zwei' }], raw_transcript: 'Teil zwei' },
+        pagination: { next_cursor: null }
+      }));
+    const client = new HttpAttioClient('secret', 'https://attio.test/v2', request);
+
+    const transcript = await client.getTranscript('meeting', 'recording');
+
+    // Attio liefert pro Seite ein eigenes raw_transcript-Stueck; nur die erste
+    // Seite zu behalten verliert bei langen Calls den Grossteil des Textes.
+    expect(transcript.raw_transcript).toBe('Teil eins\nTeil zwei');
+    expect(transcript.transcript).toHaveLength(2);
+    expect(transcript.web_url).toBe('https://attio.test/call');
+  });
 });
