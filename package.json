@@ -17,6 +17,7 @@
     "gmail:sync": "pnpm --filter @nos/server gmail:sync",
     "attio:sync": "pnpm --filter @nos/server attio:sync",
     "draft": "pnpm --filter @nos/server draft",
+    "calls:process": "pnpm --filter @nos/server calls:process",
     "typecheck": "pnpm -r typecheck",
     "gmail:setup": "bash scripts/gmail-oauth-wizard.sh",
     "attio:records": "pnpm --filter @nos/server attio:records"

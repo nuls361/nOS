@@ -12,9 +12,10 @@
     "gmail:sync": "tsx src/gmail/cli.ts",
     "attio:sync": "tsx src/attio/cli.ts",
     "draft": "tsx src/agent/cli.ts",
+    "calls:process": "tsx src/calls/cli.ts",
     "lint": "eslint src",
     "test": "vitest run src --exclude '**/*.integration.test.ts'",
-    "test:db": "vitest run src/db/schema.integration.test.ts src/attio/repository.integration.test.ts src/agent/context-repository.integration.test.ts",
+    "test:db": "vitest run --no-file-parallelism src/db/schema.integration.test.ts src/attio/repository.integration.test.ts src/agent/context-repository.integration.test.ts src/calls/repository.integration.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "attio:records": "tsx src/attio/cli.ts --records"
   },

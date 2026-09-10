@@ -62,6 +62,13 @@ Der Agent kann ausschließlich die fünf Read-only-Tools `search_mail`,
 `read_thread`, `search_calls`, `read_attio` und `read_playbook` verwenden.
 Quellenangaben werden gegen tatsächlich gelesene Tool-Ergebnisse validiert.
 
+### Call-Nachbereitung
+
+Nach dem Attio-Poll erzeugt `pnpm calls:process` aus neuen Transkripten
+Call-Nachbereitungs-Karten. Follow-up-Mail, einzelne Attio-Feldänderungen,
+Delegations-Forward und Attio-Task werden als getrennte Aktionen im Status
+`pending` gespeichert. Der Prozess führt keine dieser Aktionen selbst aus.
+
 > Revidierter Plan, Stand 08.09.2026 — ersetzt den ursprünglichen „Jarvis"-Projektplan
 > (mobile-first Entscheidungs-Cockpit mit Projekt-Tabs). Begründung der Kürzungen: siehe unten.
 
