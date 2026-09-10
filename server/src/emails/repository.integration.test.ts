@@ -10,11 +10,13 @@ const pool = databaseUrl ? new Pool({ connectionString: databaseUrl }) : null;
 const messageExternalId = `email-card-${randomUUID()}`;
 let threadId: string;
 let messageId: string;
+let archiveThreadId: string;
 
 afterAll(async () => {
   if (!pool) return;
   await pool.query("DELETE FROM cards WHERE source_type = 'gmail_message' AND source_id = $1", [messageExternalId]);
   if (threadId) await pool.query('DELETE FROM threads WHERE id = $1', [threadId]);
+  if (archiveThreadId) await pool.query('DELETE FROM threads WHERE id = $1', [archiveThreadId]);
   await pool.end();
 });
 
@@ -56,5 +58,32 @@ describeWithDatabase('EmailCardRepository integration', () => {
     const duplicate = await repository.createCard((await repository.claimNext())!, draft);
     expect(duplicate).toMatchObject({ cardId: created.cardId, existing: true });
     expect((await pool.query('SELECT id FROM actions WHERE card_id = $1', [created.cardId])).rowCount).toBe(1);
+  });
+
+  it('never claims mail older than the queue start', async () => {
+    if (!pool) throw new Error('DATABASE_URL required');
+    const thread = await pool.query<{ id: string }>(
+      `INSERT INTO threads (provider, external_id, subject) VALUES ('gmail', $1, 'Altes Archiv') RETURNING id`,
+      [`thread-${randomUUID()}`]
+    );
+    archiveThreadId = thread.rows[0]!.id;
+    // So sieht eine Mail aus, die der Zwoelf-Monats-Backfill einspielt: alt,
+    // aber mit dem Default 'unprocessed'. Sie darf keine Karte ausloesen.
+    const archived = await pool.query<{ id: string }>(
+      `INSERT INTO messages
+       (thread_id, provider, external_id, direction, sender, recipients, subject, body_text, sent_at, headers)
+       VALUES ($1, 'gmail', $2, 'inbound', 'Alt <alt@example.com>', ARRAY['niels@songpush.com'],
+               'Aus dem Archiv', 'Alte Anfrage', now() - interval '90 days', '{}'::jsonb) RETURNING id`,
+      [archiveThreadId, `archive-${randomUUID()}`]
+    );
+
+    const repository = new EmailCardRepository(pool);
+    const claimed = await repository.claimNext();
+
+    expect(claimed?.messageDatabaseId).not.toBe(archived.rows[0]!.id);
+    const status = await pool.query<{ processing_status: string }>(
+      'SELECT processing_status FROM messages WHERE id = $1', [archived.rows[0]!.id]
+    );
+    expect(status.rows[0]?.processing_status).toBe('unprocessed');
   });
 });

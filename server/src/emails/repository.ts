@@ -21,6 +21,10 @@ export class EmailCardRepository {
          WHERE direction = 'inbound'
            AND (processing_status = 'unprocessed'
              OR (processing_status = 'processing' AND processing_started_at < now() - interval '30 minutes'))
+           -- Nur Mails ab dem Aktivierungszeitpunkt: der Gmail-Backfill spielt
+           -- zwölf Monate Historie ein, und ohne diese Grenze erzeugt die
+           -- Warteschlange für jede alte Mail einen Entwurf.
+           AND sent_at >= (SELECT queue_start_at FROM email_queue_state WHERE key = 'inbound')
          ORDER BY sent_at, id
          FOR UPDATE SKIP LOCKED
          LIMIT 1

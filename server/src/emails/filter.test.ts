@@ -32,4 +32,23 @@ describe('external human mail filter', () => {
   ])('rejects irrelevant or automated mail: %j', (override) => {
     expect(isRelevantExternalHumanMail(mail(override))).toBe(false);
   });
+
+  it('drops machine mail that carries no automation headers', () => {
+    // Am echten Postfach geprueft: Superhuman-Erinnerungen tragen weder
+    // List-Unsubscribe noch Auto-Submitted oder Precedence und kamen deshalb
+    // bis in die Warteschlange - obwohl sie nie eine Antwort brauchen.
+    expect(isRelevantExternalHumanMail(mail({
+      sender: 'Superhuman <reminder@superhuman.com>',
+      subject: 'Re: WePush Onboarding',
+      body: 'Erinnerung an diesen Thread.',
+      headers: {}
+    }))).toBe(false);
+
+    expect(isRelevantExternalHumanMail(mail({
+      sender: 'Notion <notify@mail.notion.so>',
+      subject: 'Noah commented',
+      body: 'Kommentar in SongPush',
+      headers: {}
+    }))).toBe(false);
+  });
 });
