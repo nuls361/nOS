@@ -31,10 +31,19 @@ export class EmailCardPipeline {
     }
   }
 
-  async processAll(limit = 50): Promise<{ cards: number; skipped: number }> {
+  /**
+   * Ein Kartenlauf dauert gemessen 1-3 Minuten. Ohne Zeitbudget wird eine
+   * Vercel-Function (300s) mitten im Lauf abgeschnitten: das gerade geholte
+   * Element haengt dann bis zur Wiederaufnahme nach 30 Minuten fest, und die
+   * Warteschlange leert sich nie. Deshalb wird kein neues Element mehr
+   * begonnen, wenn das Budget aufgebraucht ist.
+   */
+  async processAll(limit = 50, budgetMs = Number.POSITIVE_INFINITY, now = () => Date.now()): Promise<{ cards: number; skipped: number }> {
     let cards = 0;
     let skipped = 0;
+    const startedAt = now();
     for (let index = 0; index < limit; index += 1) {
+      if (now() - startedAt >= budgetMs) break;
       const result = await this.processNext();
       if (!result) break;
       if (result === 'created') cards += 1;

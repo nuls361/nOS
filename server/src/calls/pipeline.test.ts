@@ -56,4 +56,29 @@ describe('CallCardPipeline', () => {
       'database-recording', expect.objectContaining({ message: 'quarantined_prompt_injection' })
     );
   });
+
+  it('stops claiming new work once the time budget is spent', async () => {
+    let clock = 0;
+    const repository = {
+      // Immer neue Arbeit vorhanden: ohne Budget liefe die Schleife bis zum Limit.
+      claimNext: vi.fn().mockImplementation(async () => ({
+        recordingDatabaseId: `rec-${clock}`, callRecordingId: `call-${clock}`,
+        meetingId: 'meeting', meetingTitle: 'Call', participants: [], linkedRecords: [],
+        rawTranscript: 'Inhalt'
+      })),
+      createCard: vi.fn().mockImplementation(async () => {
+        clock += 90_000; // ein Kartenlauf dauert gemessen 1-3 Minuten
+        return { cardId: `card-${clock}`, actionCount: 1, existing: false };
+      }),
+      markFailed: vi.fn()
+    };
+    const generator = { generate: vi.fn().mockResolvedValue({}) };
+
+    const result = await new CallCardPipeline(repository, generator)
+      .processAll(10, 210_000, () => clock);
+
+    // 210s Budget bei 90s je Karte: drei Laeufe, nicht zehn.
+    expect(result.cards).toBe(3);
+    expect(repository.claimNext).toHaveBeenCalledTimes(3);
+  });
 });

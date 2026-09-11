@@ -1,4 +1,9 @@
 import '../env.js';
+
+// Die Functions laufen mit maxDuration 300s. Ein Kartenlauf dauert gemessen
+// 1-3 Minuten, deshalb bleibt Puffer und es werden nur wenige Karten je Lauf
+// begonnen. Was liegen bleibt, holt der naechste Cron-Takt.
+const cardBudgetMs = Number(process.env.CARD_BUDGET_MS ?? 210_000);
 import { google } from 'googleapis';
 import { ContextRepository } from '../agent/context-repository.js';
 import { HttpAttioClient } from '../attio/client.js';
@@ -27,7 +32,7 @@ export const runGmailCron = async () => {
     const gmail = backfill.complete && backfill.messages === 0 ? await sync.incremental() : backfill;
     const cards = await new EmailCardPipeline(
       new EmailCardRepository(pool), createMailCardGenerator(new ContextRepository(pool))
-    ).processAll(20);
+    ).processAll(Number(process.env.MAIL_CARDS_PER_RUN ?? 3), cardBudgetMs);
     return { gmail, cards };
   } finally { await pool.end(); }
 };
@@ -42,7 +47,7 @@ export const runRecordingsCron = async () => {
     );
     const cards = await new CallCardPipeline(
       new CallCardRepository(pool), createCallCardGenerator(new ContextRepository(pool))
-    ).processAll(10);
+    ).processAll(Number(process.env.CALL_CARDS_PER_RUN ?? 3), cardBudgetMs);
     return { recordings, cards };
   } finally { await pool.end(); }
 };
