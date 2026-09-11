@@ -2,7 +2,8 @@ import { parseMessage } from './message.js';
 import type { GmailRepository } from './repository.js';
 import type { GmailClient } from './types.js';
 
-type GmailStore = Pick<GmailRepository, 'saveMessage' | 'getHistoryId' | 'saveSyncState'>;
+type GmailStore = Pick<GmailRepository,
+  'saveMessage' | 'getHistoryId' | 'saveSyncState' | 'getBackfillState' | 'saveBackfillState'>;
 
 const twelveMonthsAgo = (): string => {
   const date = new Date();
@@ -60,10 +61,41 @@ export class GmailSync {
     return { mode: 'full', messages, historyId: profile.historyId };
   }
 
-  async incremental(): Promise<{ mode: 'incremental' | 'full'; messages: number; historyId: string }> {
+  async backfillBatch(maxPages = 1): Promise<{
+    mode: 'backfill'; messages: number; complete: boolean; nextPageToken: string | null;
+  }> {
+    if (!Number.isInteger(maxPages) || maxPages < 1 || maxPages > 10) throw new Error('maxPages must be 1..10');
+    const profile = await this.client.getProfile();
+    const saved = await this.repository.getBackfillState(profile.emailAddress);
+    if (saved?.completed) return { mode: 'backfill', messages: 0, complete: true, nextPageToken: null };
+    const initialHistoryId = saved?.initialHistoryId ?? profile.historyId;
+    let pageToken = saved?.pageToken ?? undefined;
+    let messages = 0;
+    for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {
+      const page = await this.client.listMessages(
+        `after:${twelveMonthsAgo()} -in:chats -in:drafts -in:spam -in:trash`, pageToken
+      );
+      messages += await this.saveMessages(page.items.map(({ id }) => id));
+      pageToken = page.nextPageToken;
+      const complete = !pageToken;
+      await this.repository.saveBackfillState(
+        profile.emailAddress, initialHistoryId, pageToken ?? null, complete
+      );
+      if (complete) {
+        await this.repository.saveSyncState(profile.emailAddress, initialHistoryId, true);
+        return { mode: 'backfill', messages, complete: true, nextPageToken: null };
+      }
+    }
+    return { mode: 'backfill', messages, complete: false, nextPageToken: pageToken ?? null };
+  }
+
+  async incremental(): Promise<
+    { mode: 'incremental' | 'full'; messages: number; historyId: string }
+    | { mode: 'backfill'; messages: number; complete: boolean; nextPageToken: string | null }
+  > {
     const profile = await this.client.getProfile();
     const startHistoryId = await this.repository.getHistoryId(profile.emailAddress);
-    if (!startHistoryId) return this.full();
+    if (!startHistoryId) return this.backfillBatch();
 
     try {
       const ids: string[] = [];
@@ -79,7 +111,10 @@ export class GmailSync {
       await this.repository.saveSyncState(profile.emailAddress, historyId, false);
       return { mode: 'incremental', messages, historyId };
     } catch (error) {
-      if (isExpiredHistory(error)) return this.full();
+      if (isExpiredHistory(error)) {
+        await this.repository.saveBackfillState(profile.emailAddress, profile.historyId, null, false);
+        return this.backfillBatch();
+      }
       throw error;
     }
   }

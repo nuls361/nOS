@@ -23,6 +23,17 @@ const loadSavedCredentials = async (): Promise<Auth.OAuth2Client | null> => {
 };
 
 export const authorizeGmail = async (interactive = false): Promise<Auth.OAuth2Client> => {
+  const clientId = process.env.GMAIL_CLIENT_ID;
+  const clientSecret = process.env.GMAIL_CLIENT_SECRET;
+  const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
+  if (clientId || clientSecret || refreshToken) {
+    if (!clientId || !clientSecret || !refreshToken) {
+      throw new Error('GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET and GMAIL_REFRESH_TOKEN must be set together');
+    }
+    const client = new google.auth.OAuth2(clientId, clientSecret);
+    client.setCredentials({ refresh_token: refreshToken });
+    return client;
+  }
   const saved = await loadSavedCredentials();
   if (saved) return saved;
   if (!interactive) throw new Error('No Gmail OAuth token found. Run `pnpm gmail:auth` first.');

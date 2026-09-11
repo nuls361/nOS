@@ -18,6 +18,10 @@ for (const name of fileSecrets) {
   if (path) process.env[name] = readFileSync(path, 'utf8').trim();
 }
 
+if (process.env.VERCEL && process.env.DATABASE_URL_POOLED) {
+  process.env.DATABASE_URL = process.env.DATABASE_URL_POOLED;
+}
+
 // Production Compose keeps the database password in a Docker secret. Build the
 // connection URL inside the process so it never needs to live in an env file.
 if (!process.env.DATABASE_URL && process.env.POSTGRES_PASSWORD) {

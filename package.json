@@ -21,7 +21,7 @@
     "emails:process": "pnpm --filter @nos/server emails:process",
     "actions:execute": "pnpm --filter @nos/server actions:execute",
     "playbook:mine": "pnpm --filter @nos/server playbook:mine",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm -r typecheck && tsc -p tsconfig.vercel.json --noEmit",
     "gmail:setup": "bash scripts/gmail-oauth-wizard.sh",
     "attio:records": "pnpm --filter @nos/server attio:records"
   },

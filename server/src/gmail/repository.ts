@@ -79,4 +79,29 @@ export class GmailRepository {
       [accountEmail, historyId, full]
     );
   }
+
+  async getBackfillState(accountEmail: string): Promise<{
+    pageToken: string | null; initialHistoryId: string; completed: boolean;
+  } | null> {
+    const result = await this.pool.query<{
+      page_token: string | null; initial_history_id: string; completed_at: Date | null;
+    }>('SELECT page_token, initial_history_id, completed_at FROM gmail_backfill_state WHERE account_email = $1', [accountEmail]);
+    const row = result.rows[0];
+    return row ? {
+      pageToken: row.page_token, initialHistoryId: row.initial_history_id, completed: Boolean(row.completed_at)
+    } : null;
+  }
+
+  async saveBackfillState(
+    accountEmail: string, initialHistoryId: string, pageToken: string | null, completed: boolean
+  ): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO gmail_backfill_state (account_email, page_token, initial_history_id, completed_at)
+       VALUES ($1, $2, $3, CASE WHEN $4 THEN now() END)
+       ON CONFLICT (account_email) DO UPDATE SET page_token = EXCLUDED.page_token,
+         initial_history_id = EXCLUDED.initial_history_id,
+         completed_at = CASE WHEN $4 THEN now() ELSE NULL END, updated_at = now()`,
+      [accountEmail, pageToken, initialHistoryId, completed]
+    );
+  }
 }

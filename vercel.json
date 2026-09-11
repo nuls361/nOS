@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "pnpm --filter @nos/web build",
+  "outputDirectory": "web/dist",
+  "regions": ["fra1"],
+  "functions": {
+    "api/**/*.ts": { "maxDuration": 300, "includeFiles": "server/migrations/**" }
+  },
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    { "path": "/api/cron/sync-gmail", "schedule": "*/30 * * * *" },
+    { "path": "/api/cron/poll-recordings", "schedule": "*/15 * * * *" }
+  ]
+}

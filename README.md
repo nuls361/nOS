@@ -31,6 +31,8 @@ pnpm test:db
 
 ## Produktion auf Hetzner
 
+> Legacy/self-hosted fallback. Der primäre Produktionspfad ist seit Issue #15 Vercel.
+
 Das Produktions-Setup läuft vollständig per Docker Compose: Caddy terminiert TLS,
 Nginx liefert die SPA aus, der Fastify-Server bleibt intern, Postgres besitzt keinen
 öffentlichen Port und ein einzelner Worker führt alle Polling- und Queue-Jobs aus.
@@ -69,6 +71,41 @@ und lokale Env-Dateien auch aus dem Build-Kontext aus. Der externe Zugriff erfol
 nur über HTTPS. Sämtliche Arbeitsraum-Endpunkte benötigen die signierte Session;
 `/api/health` benötigt zusätzlich den internen Bearer-Token, Login ist naturgemäß
 öffentlich.
+
+## Produktion auf Vercel
+
+Das Root-Projekt wird als Vite-SPA plus Node.js Functions deployt. `vercel.json`
+setzt die Function-Region auf Frankfurt und registriert zwei UTC-Crons:
+`/api/cron/sync-gmail` alle 30 Minuten und `/api/cron/poll-recordings` alle
+15 Minuten. Beide akzeptieren ausschließlich `Authorization: Bearer CRON_SECRET`.
+
+In Vercel müssen `APP_PASSWORD`, `SESSION_SECRET`, `INTERNAL_HEALTH_TOKEN`,
+`CRON_SECRET`, `OPENROUTER_API_KEY`, `ATTIO_API_KEY`, `GMAIL_CLIENT_ID`,
+`GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` und `DATABASE_URL_POOLED` als
+verschlüsselte Environment Variables gesetzt werden. `DATABASE_URL_POOLED` muss
+der Transaction-Pooler (beispielsweise Supabase Port 6543) sein. nOS begrenzt
+jede Function-Instanz auf drei Verbindungen und verwendet keine benannten
+Prepared Statements.
+
+Der Gmail-Zwölfmonats-Backfill verarbeitet standardmäßig genau eine Gmail-Seite
+pro Invocation und persistiert `page_token` plus den vor dem Backfill gelesenen
+History-Cursor in Postgres. So gehen während des mehrteiligen Imports keine neuen
+Nachrichten verloren und keine Function benötigt ein persistentes Dateisystem.
+Die JSON-Dateien unter `secrets/` bleiben ausschließlich lokaler Fallback.
+
+Deployment und Kontrolle:
+
+```bash
+vercel link
+vercel env add CRON_SECRET production
+# übrige Variablen analog setzen
+vercel --prod
+vercel logs --environment production
+```
+
+Die Cron-Ausführungen sind zusätzlich im Vercel-Dashboard unter Settings → Cron
+Jobs sichtbar. Vercel sendet bei Cron-Aufrufen den konfigurierten Secret-Wert
+automatisch als Bearer-Header.
 
 ### Gmail-Synchronisierung
 

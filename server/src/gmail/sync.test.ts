@@ -19,7 +19,9 @@ const gmailMessage = (id: string): GmailMessage => ({
 const store = (historyId: string | null) => ({
   saveMessage: vi.fn<(message: ParsedMessage) => Promise<void>>().mockResolvedValue(undefined),
   getHistoryId: vi.fn<() => Promise<string | null>>().mockResolvedValue(historyId),
-  saveSyncState: vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
+  saveSyncState: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  getBackfillState: vi.fn().mockResolvedValue(null),
+  saveBackfillState: vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
 });
 
 const client = (): GmailClient => ({
@@ -61,7 +63,7 @@ describe('GmailSync', () => {
     expect(repository.saveSyncState).toHaveBeenCalledWith('niels@songpush.com', '21', false);
   });
 
-  it('falls back to full sync when Gmail history has expired', async () => {
+  it('falls back to a bounded backfill batch when Gmail history has expired', async () => {
     const api = client();
     vi.mocked(api.listAddedMessageIds).mockRejectedValue({ response: { status: 404 } });
     vi.mocked(api.listMessages).mockResolvedValue({ items: [{ id: 'fresh' }] });
@@ -69,7 +71,32 @@ describe('GmailSync', () => {
 
     const result = await new GmailSync(api, repository).incremental();
 
-    expect(result.mode).toBe('full');
+    expect(result.mode).toBe('backfill');
     expect(api.listMessages).toHaveBeenCalledOnce();
+    expect(repository.saveBackfillState).toHaveBeenCalledWith('niels@songpush.com', '20', null, false);
+  });
+
+  it('persists a page cursor and resumes the serverless backfill', async () => {
+    const api = client();
+    vi.mocked(api.listMessages).mockResolvedValueOnce({ items: [{ id: 'a' }], nextPageToken: 'page-2' });
+    const repository = store(null);
+    const sync = new GmailSync(api, repository);
+
+    await expect(sync.backfillBatch(1)).resolves.toEqual({
+      mode: 'backfill', messages: 1, complete: false, nextPageToken: 'page-2'
+    });
+    expect(repository.saveBackfillState).toHaveBeenCalledWith(
+      'niels@songpush.com', '20', 'page-2', false
+    );
+
+    repository.getBackfillState.mockResolvedValue({
+      pageToken: 'page-2', initialHistoryId: '20', completed: false
+    });
+    vi.mocked(api.listMessages).mockResolvedValueOnce({ items: [{ id: 'b' }] });
+    await expect(sync.backfillBatch(1)).resolves.toEqual({
+      mode: 'backfill', messages: 1, complete: true, nextPageToken: null
+    });
+    expect(api.listMessages).toHaveBeenLastCalledWith(expect.any(String), 'page-2');
+    expect(repository.saveSyncState).toHaveBeenCalledWith('niels@songpush.com', '20', true);
   });
 });
